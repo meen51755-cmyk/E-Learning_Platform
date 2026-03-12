@@ -1,0 +1,353 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* E-Learning Platform Design System - Modern & Clean */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    /* Core Colors - Clean Blue Theme */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary - Professional Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Soft Gray */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    /* Muted */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent - Teal for highlights */
+    --accent: 168 76% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Success - Green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 60%;
+
+    /* Custom - E-Learning Specific */
+    --hero-gradient: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(240 80% 65%) 100%);
+    --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --card-shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --overlay: 222 47% 11% / 0.5;
+
+    /* Progress colors */
+    --progress-bg: 220 14% 96%;
+    --progress-fill: 217 91% 60%;
+
+    /* Badge colors */
+    --badge-beginner: 142 76% 36%;
+    --badge-intermediate: 38 92% 50%;
+    --badge-advanced: 0 84% 60%;
+    --badge-free: 168 76% 42%;
+    --badge-paid: 217 91% 60%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 168 76% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
+
+    --hero-gradient: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(240 70% 55%) 100%);
+    --overlay: 0 0% 0% / 0.6;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Hero Button Gradient */
+  .btn-hero {
+    @apply bg-primary text-primary-foreground font-semibold px-8 py-3 rounded-lg;
+    background: var(--hero-gradient);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px 0 hsl(217 91% 60% / 0.4);
+  }
+  
+  .btn-hero:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px 0 hsl(217 91% 60% / 0.5);
+  }
+
+  /* Card with shadow */
+  .card-elevated {
+    @apply bg-card rounded-xl border border-border;
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  
+  .card-elevated:hover {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-2px);
+  }
+
+  /* Course Card */
+  .course-card {
+    @apply bg-card rounded-xl overflow-hidden border border-border;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s ease;
+  }
+  
+  .course-card:hover {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-4px);
+  }
+
+  /* Progress Bar */
+  .progress-bar {
+    @apply h-2 rounded-full;
+    background: hsl(var(--progress-bg));
+  }
+  
+  .progress-bar-fill {
+    @apply h-full rounded-full;
+    background: hsl(var(--progress-fill));
+    transition: width 0.5s ease;
+  }
+
+  /* Badge variants */
+  .badge-level-beginner {
+    @apply text-xs font-medium px-2.5 py-0.5 rounded-full;
+    background: hsl(var(--badge-beginner) / 0.1);
+    color: hsl(var(--badge-beginner));
+  }
+  
+  .badge-level-intermediate {
+    @apply text-xs font-medium px-2.5 py-0.5 rounded-full;
+    background: hsl(var(--badge-intermediate) / 0.1);
+    color: hsl(var(--badge-intermediate));
+  }
+  
+  .badge-level-advanced {
+    @apply text-xs font-medium px-2.5 py-0.5 rounded-full;
+    background: hsl(var(--badge-advanced) / 0.1);
+    color: hsl(var(--badge-advanced));
+  }
+  
+  .badge-free {
+    @apply text-xs font-semibold px-2.5 py-0.5 rounded-full;
+    background: hsl(var(--badge-free) / 0.1);
+    color: hsl(var(--badge-free));
+  }
+  
+  .badge-paid {
+    @apply text-xs font-semibold px-2.5 py-0.5 rounded-full;
+    background: hsl(var(--badge-paid) / 0.1);
+    color: hsl(var(--badge-paid));
+  }
+
+  /* Stats Card */
+  .stats-card {
+    @apply bg-card rounded-xl p-6 border border-border;
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Sidebar Item */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground;
+    transition: all 0.2s ease;
+  }
+  
+  .sidebar-item:hover {
+    @apply bg-secondary text-foreground;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* Video Player Container */
+  .video-container {
+    @apply bg-black rounded-xl overflow-hidden aspect-video;
+  }
+
+  /* Quiz Option */
+  .quiz-option {
+    @apply p-4 rounded-lg border-2 border-border cursor-pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .quiz-option:hover {
+    @apply border-primary/50 bg-primary/5;
+  }
+  
+  .quiz-option.selected {
+    @apply border-primary bg-primary/10;
+  }
+  
+  .quiz-option.correct {
+    @apply border-success bg-success/10;
+  }
+  
+  .quiz-option.incorrect {
+    @apply border-destructive bg-destructive/10;
+  }
+
+  /* Avatar sizes */
+  .avatar-sm { @apply w-8 h-8; }
+  .avatar-md { @apply w-10 h-10; }
+  .avatar-lg { @apply w-12 h-12; }
+  .avatar-xl { @apply w-16 h-16; }
+
+  /* Section spacing */
+  .section-padding {
+    @apply py-16 md:py-24;
+  }
+  
+  .container-padding {
+    @apply px-4 md:px-6 lg:px-8;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: var(--hero-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glassmorphism */
+  .glass {
+    @apply bg-background/80 backdrop-blur-lg border border-border/50;
+  }
+
+  /* Input Focus */
+  .input-focus {
+    @apply focus:ring-2 focus:ring-primary/20 focus:border-primary;
+  }
+
+  /* Table */
+  .table-header {
+    @apply bg-muted/50 text-muted-foreground text-sm font-medium;
+  }
+  
+  .table-row {
+    @apply border-b border-border hover:bg-muted/30;
+    transition: background 0.15s ease;
+  }
+
+  /* Skeleton Animation */
+  .skeleton {
+    @apply bg-muted animate-pulse rounded;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Line clamp */
+  .line-clamp-1 { 
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-2 { 
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-3 { 
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
