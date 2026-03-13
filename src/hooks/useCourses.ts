@@ -1,135 +1,109 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sampleCourses, categories } from "@/data/mockData";
 
-export interface CourseWithDetails {
+export interface Course {
   id: string;
   title: string;
-  description: string | null;
-  thumbnail_url: string | null;
+  description: string;
+  instructor: string;
   price: number;
-  is_free: boolean;
+  isFree: boolean;
   level: string;
-  status: string;
-  tags: string[];
-  duration: string | null;
-  total_lessons: number;
   rating: number;
-  total_students: number;
-  created_at: string;
-  instructor_id: string;
-  category_id: string | null;
-  instructor_name?: string;
+  totalStudents: number;
+  thumbnail?: string;
   category_name?: string;
+  duration?: string;
+  totalLessons?: number;
 }
 
-export const useCourses = (filters?: {
-  category?: string;
-  level?: string;
+export interface Category {
+  id: string;
+  name: string;
+}
+
+interface UseCoursesOptions {
   search?: string;
+  level?: string;
   isFree?: boolean;
-}) => {
+  category?: string;
+}
+
+// ── useCourses ────────────────────────────────────────────────
+export const useCourses = (options: UseCoursesOptions = {}) => {
   return useQuery({
-    queryKey: ["courses", filters],
-    queryFn: async () => {
-      let query = supabase
-        .from("courses")
-        .select(`
-          *,
-          categories ( name )
-        `)
-        .eq("status", "published")
-        .order("created_at", { ascending: false });
+    queryKey: ["courses", options],
+    queryFn: async (): Promise<Course[]> => {
+      // TODO: ดึงจาก Supabase เมื่อมี courses table จริง
+      // const { data, error } = await supabase
+      //   .from("courses")
+      //   .select("*, categories(name)")
+      //   .eq(options.isFree !== undefined ? "is_free" : "", options.isFree)
+      //   .ilike(options.search ? "title" : "", `%${options.search}%`)
 
-      if (filters?.category && filters.category !== "ทั้งหมด") {
-        query = query.eq("categories.name", filters.category);
-      }
-      if (filters?.level) {
-        query = query.eq("level", filters.level as any);
-      }
-      if (filters?.search) {
-        query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-      }
-      if (filters?.isFree !== undefined) {
-        query = query.eq("is_free", filters.isFree);
-      }
+      // ตอนนี้ใช้ mockData ก่อน
+      let result = sampleCourses.map((c) => ({
+        ...c,
+        category_name: c.category,
+      }));
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Fetch instructor names separately
-      const courses = data || [];
-      const instructorIds = [...new Set(courses.map((c: any) => c.instructor_id))];
-      
-      let profilesMap: Record<string, string> = {};
-      if (instructorIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .in("user_id", instructorIds);
-        if (profiles) {
-          profilesMap = Object.fromEntries(profiles.map(p => [p.user_id, p.full_name]));
-        }
+      // filter search
+      if (options.search) {
+        const q = options.search.toLowerCase();
+        result = result.filter(
+          (c) =>
+            c.title.toLowerCase().includes(q) ||
+            c.instructor.toLowerCase().includes(q) ||
+            c.category.toLowerCase().includes(q)
+        );
       }
 
-      return courses.map((course: any) => ({
-        ...course,
-        instructor_name: profilesMap[course.instructor_id] || "ผู้สอน",
-        category_name: course.categories?.name || "",
-      })) as CourseWithDetails[];
+      // filter level
+      if (options.level) {
+        result = result.filter(
+          (c) => c.level.toLowerCase() === options.level!.toLowerCase()
+        );
+      }
+
+      // filter price
+      if (options.isFree !== undefined) {
+        result = result.filter((c) => c.isFree === options.isFree);
+      }
+
+      return result;
     },
+    staleTime: 1000 * 60 * 5, // cache 5 นาที
   });
 };
 
-export const useCourseDetail = (id: string) => {
-  return useQuery({
-    queryKey: ["course", id],
-    queryFn: async () => {
-      const { data: course, error } = await supabase
-        .from("courses")
-        .select(`
-          *,
-          categories ( name ),
-          modules (
-            *,
-            lessons ( * ),
-            quizzes (
-              *,
-              questions ( * )
-            )
-          )
-        `)
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-
-      // Fetch instructor profile separately
-      let instructor = null;
-      if (course?.instructor_id) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, avatar_url")
-          .eq("user_id", course.instructor_id)
-          .single();
-        instructor = profile;
-      }
-
-      return { ...course, profiles: instructor };
-    },
-    enabled: !!id,
-  });
-};
-
+// ── useCategories ─────────────────────────────────────────────
 export const useCategories = () => {
   return useQuery({
     queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data || [];
+    queryFn: async (): Promise<Category[]> => {
+      // TODO: ดึงจาก Supabase เมื่อมี categories table จริง
+      // const { data } = await supabase.from("categories").select("*")
+
+      // ตอนนี้ใช้ mockData ก่อน
+      return categories.map((name, i) => ({
+        id: String(i + 1),
+        name,
+      }));
     },
+    staleTime: 1000 * 60 * 10,
+  });
+};
+
+// ── useCourse (single) ────────────────────────────────────────
+export const useCourse = (id: string) => {
+  return useQuery({
+    queryKey: ["course", id],
+    queryFn: async (): Promise<Course | null> => {
+      const course = sampleCourses.find((c) => c.id === id);
+      if (!course) return null;
+      return { ...course, category_name: course.category };
+    },
+    enabled: !!id,
   });
 };
