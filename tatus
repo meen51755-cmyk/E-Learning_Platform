@@ -1,0 +1,5 @@
+[33m5bb86bc[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: correct vercel.json filename
+[33mc8f6459[m fix: vercel routing
+[33me374070[m fix: rename vercal to vercel
+[33mb602876[m fix: add vercel rewrite for SPA routing
+[33md70d8e3[m first deploy

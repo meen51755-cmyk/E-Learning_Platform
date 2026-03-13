@@ -1,0 +1,22 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle with Gradient -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Circle Background -->
+  <circle cx="16" cy="16" r="15" fill="url(#grad1)"/>
+  
+  <!-- Book Icon -->
+  <path d="M9 7C9 6.44772 9.44772 6 10 6H14C14.5523 6 15 6.44772 15 7V25C15 25.5523 14.5523 26 14 26H10C9.44772 26 9 25.5523 9 25V7Z" fill="white" fill-opacity="0.9"/>
+  <path d="M17 7C17 6.44772 17.4477 6 18 6H22C22.5523 6 23 6.44772 23 7V25C23 25.5523 22.5523 26 22 26H18C17.4477 26 17 25.5523 17 25V7Z" fill="white" fill-opacity="0.9"/>
+  
+  <!-- Center Line -->
+  <line x1="16" y1="8" x2="16" y2="24" stroke="white" stroke-width="0.5" stroke-opacity="0.5"/>
+  
+  <!-- Shine Effect -->
+  <circle cx="11" cy="10" r="1.5" fill="white" fill-opacity="0.3"/>
+</svg>

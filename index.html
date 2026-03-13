@@ -1,25 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>LearnHub</title>
-    <meta name="description" content="LearnHub - Your Learning Companion" />
-    <meta name="author" content="LearnHub" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="LearnHub" />
-    <meta property="og:description" content="LearnHub - Your Learning Companion" />
+    <!-- Title & Description -->
+    <title>LearnHub - แพลตฟอร์มเรียนออนไลน์คุณภาพสูง</title>
+    <meta name="description" content="เรียนรู้ทักษะใหม่ๆ กับคอร์สออนไลน์คุณภาพจากผู้เชี่ยวชาญ" />
+    <meta name="theme-color" content="#6366f1" />
+
+    <!-- Open Graph (รูปที่แสดงตอน share link) -->
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:site_name" content="LearnHub" />
+    <meta property="og:title" content="LearnHub - แพลตฟอร์มเรียนออนไลน์คุณภาพสูง" />
+    <meta property="og:description" content="เรียนรู้ทักษะใหม่ๆ กับคอร์สออนไลน์คุณภาพจากผู้เชี่ยวชาญ" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
 
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@LearnHub" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-  </head>
+    <meta name="twitter:title" content="LearnHub - แพลตฟอร์มเรียนออนไลน์คุณภาพสูง" />
+    <meta name="twitter:description" content="เรียนรู้ทักษะใหม่ๆ กับคอร์สออนไลน์คุณภาพจากผู้เชี่ยวชาญ" />
+    <meta name="twitter:image" content="/og-image.png" />
 
+    <!-- Override Lovable branding -->
+    <script src="/override-lovable.js"></script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
