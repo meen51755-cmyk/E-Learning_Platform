@@ -1,7 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
-import { sampleCourses, categories, type Course } from "@/data/mockData";
+import { sampleCourses, categories } from "@/data/mockData";
 
-export type { Course };
+// interface ที่ตรงกับ CourseCard ต้องการ
+export interface CourseWithDetails {
+  id: string;
+  title: string;
+  description: string;
+  instructor_name: string;
+  price: number;
+  is_free: boolean;
+  level: string;
+  rating: number;
+  total_students: number;
+  thumbnail_url?: string;
+  category_name?: string;
+  duration?: string;
+  total_lessons?: number;
+}
 
 export interface Category {
   id: string;
@@ -14,10 +29,27 @@ interface UseCoursesOptions {
   isFree?: boolean;
 }
 
+// map mockData → CourseWithDetails
+const toDetails = (c: typeof sampleCourses[0]): CourseWithDetails => ({
+  id: c.id,
+  title: c.title,
+  description: c.description,
+  instructor_name: c.instructor,
+  price: c.price,
+  is_free: c.isFree,
+  level: c.level,
+  rating: c.rating,
+  total_students: c.totalStudents,
+  thumbnail_url: c.thumbnail || undefined,
+  category_name: c.category,
+  duration: c.duration,
+  total_lessons: c.totalLessons,
+});
+
 export const useCourses = (options: UseCoursesOptions = {}) => {
   return useQuery({
     queryKey: ["courses", options],
-    queryFn: async (): Promise<Course[]> => {
+    queryFn: async (): Promise<CourseWithDetails[]> => {
       let result = [...sampleCourses];
 
       if (options.search) {
@@ -38,7 +70,7 @@ export const useCourses = (options: UseCoursesOptions = {}) => {
         result = result.filter((c) => c.isFree === options.isFree);
       }
 
-      return result;
+      return result.map(toDetails);
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -48,7 +80,6 @@ export const useCategories = () => {
   return useQuery({
     queryKey: ["categories"],
     queryFn: async (): Promise<Category[]> => {
-      // กรอง "ทั้งหมด" ออก เพราะ Courses.tsx จัดการเองอยู่แล้ว
       return categories
         .filter((name) => name !== "ทั้งหมด")
         .map((name, i) => ({ id: String(i + 1), name }));
@@ -60,8 +91,9 @@ export const useCategories = () => {
 export const useCourse = (id: string) => {
   return useQuery({
     queryKey: ["course", id],
-    queryFn: async (): Promise<Course | null> => {
-      return sampleCourses.find((c) => c.id === id) ?? null;
+    queryFn: async (): Promise<CourseWithDetails | null> => {
+      const c = sampleCourses.find((c) => c.id === id);
+      return c ? toDetails(c) : null;
     },
     enabled: !!id,
   });
