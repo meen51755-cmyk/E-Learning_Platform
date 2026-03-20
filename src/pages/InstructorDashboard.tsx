@@ -5,11 +5,13 @@ import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstructorDashboard } from "@/hooks/useDashboard";
+import { useSessionGuard } from "@/hooks/useSessionGuard";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import {
   Users, TrendingUp, DollarSign, BookOpen,
   Star, BarChart2, Zap, RefreshCw, Loader2,
   ChevronUp, CheckCircle, XCircle, Clock,
-  Award, Activity
+  Award, Activity, Plus
 } from "lucide-react";
 
 const formatCurrency = (amount: number) =>
@@ -24,13 +26,11 @@ const formatTime = (seconds: number) => {
 const InstructorDashboard = () => {
   const { user, profile, signOut } = useAuth();
   const {
-    todayEnrollments,
-    totalRevenue,
-    recentQuizResults,
-    recentTransactions,
-    loading,
-    refetch,
+    todayEnrollments, totalRevenue, recentQuizResults,
+    recentTransactions, loading, refetch,
   } = useInstructorDashboard();
+
+  useSessionGuard(); // ✅ Single session enforcement
 
   const [activeTab, setActiveTab] = useState<"quiz" | "transactions">("quiz");
 
@@ -38,14 +38,12 @@ const InstructorDashboard = () => {
   const initials = displayName.charAt(0).toUpperCase();
   const avatarUrl = profile?.avatar_url;
 
-  const avgScore =
-    recentQuizResults.length > 0
-      ? Math.round(recentQuizResults.reduce((sum, q) => sum + q.score, 0) / recentQuizResults.length)
-      : 0;
-  const passRate =
-    recentQuizResults.length > 0
-      ? Math.round((recentQuizResults.filter((q) => q.passed).length / recentQuizResults.length) * 100)
-      : 0;
+  const avgScore = recentQuizResults.length > 0
+    ? Math.round(recentQuizResults.reduce((sum, q) => sum + q.score, 0) / recentQuizResults.length)
+    : 0;
+  const passRate = recentQuizResults.length > 0
+    ? Math.round((recentQuizResults.filter((q) => q.passed).length / recentQuizResults.length) * 100)
+    : 0;
 
   if (loading) {
     return (
@@ -87,8 +85,12 @@ const InstructorDashboard = () => {
               </div>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
+            <Link to="/instructor/courses/create">
+              <Button variant="hero" size="sm">
+                <Plus className="w-4 h-4" /> สร้างคอร์ส
+              </Button>
+            </Link>
             <Button variant="ghost" size="sm" onClick={refetch} title="รีเฟรช">
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -98,69 +100,30 @@ const InstructorDashboard = () => {
 
         {/* ── KPI Cards ──────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* ผู้เรียนใหม่วันนี้ */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 hover:shadow-md transition-all relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-500" />
+          {[
+            { icon: Users, label: "ผู้เรียนใหม่วันนี้", value: todayEnrollments, color: "blue", suffix: "" },
+            { icon: DollarSign, label: "รายได้สะสม", value: formatCurrency(totalRevenue), color: "emerald", suffix: "" },
+            { icon: Star, label: "คะแนน Quiz เฉลี่ย", value: avgScore, color: "amber", suffix: "/100" },
+            { icon: Award, label: "อัตราผ่าน Quiz", value: passRate, color: "violet", suffix: "%" },
+          ].map((card) => (
+            <div key={card.label} className={`rounded-2xl border border-border bg-card p-5 space-y-3 hover:shadow-md transition-all relative overflow-hidden`}>
+              <div className={`absolute inset-0 bg-gradient-to-br from-${card.color}-500/5 to-transparent pointer-events-none`} />
+              <div className="flex items-center justify-between">
+                <div className={`w-10 h-10 rounded-xl bg-${card.color}-500/10 flex items-center justify-center`}>
+                  <card.icon className={`w-5 h-5 text-${card.color}-500`} />
+                </div>
+                <span className="flex items-center gap-1 text-xs text-success font-medium">
+                  <ChevronUp className="w-3 h-3" /> Live
+                </span>
               </div>
-              <span className="flex items-center gap-1 text-xs text-success font-medium">
-                <ChevronUp className="w-3 h-3" /> Live
-              </span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground">{todayEnrollments}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">ผู้เรียนใหม่วันนี้</p>
-            </div>
-          </div>
-
-          {/* รายได้สะสม */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 hover:shadow-md transition-all relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">
+                  {card.value}<span className="text-base text-muted-foreground">{card.suffix}</span>
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">{card.label}</p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-success font-medium">
-                <ChevronUp className="w-3 h-3" /> Live
-              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">รายได้สะสม</p>
-            </div>
-          </div>
-
-          {/* คะแนน Quiz เฉลี่ย */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 hover:shadow-md transition-all relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <Star className="w-5 h-5 text-amber-500" />
-              </div>
-              <span className="text-xs text-muted-foreground">เฉลี่ย</span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground">{avgScore}<span className="text-lg text-muted-foreground">/100</span></p>
-              <p className="text-sm text-muted-foreground mt-0.5">คะแนน Quiz เฉลี่ย</p>
-            </div>
-          </div>
-
-          {/* อัตราผ่าน */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 hover:shadow-md transition-all relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                <Award className="w-5 h-5 text-violet-500" />
-              </div>
-              <span className="text-xs text-muted-foreground">Pass Rate</span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground">{passRate}<span className="text-lg text-muted-foreground">%</span></p>
-              <p className="text-sm text-muted-foreground mt-0.5">อัตราผ่าน Quiz</p>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* ── Score Distribution Bar ─────────────────────────── */}
@@ -171,15 +134,11 @@ const InstructorDashboard = () => {
               <h2 className="font-semibold text-foreground text-sm">การกระจายคะแนน Quiz (10 ครั้งล่าสุด)</h2>
             </div>
             <div className="flex items-end gap-2 h-24">
-              {recentQuizResults.map((q, i) => (
+              {recentQuizResults.map((q) => (
                 <div key={q.id} className="flex-1 flex flex-col items-center gap-1 group">
-                  <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                    {q.score}
-                  </span>
+                  <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">{q.score}</span>
                   <div
-                    className={`w-full rounded-t-md transition-all duration-500 ${
-                      q.passed ? "bg-gradient-to-t from-emerald-600 to-emerald-400" : "bg-gradient-to-t from-red-600 to-red-400"
-                    }`}
+                    className={`w-full rounded-t-md transition-all duration-500 ${q.passed ? "bg-gradient-to-t from-emerald-600 to-emerald-400" : "bg-gradient-to-t from-red-600 to-red-400"}`}
                     style={{ height: `${q.score}%` }}
                   />
                 </div>
@@ -209,129 +168,106 @@ const InstructorDashboard = () => {
                 activeTab === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <tab.icon className="w-4 h-4" /> {tab.label}
             </button>
           ))}
         </div>
 
         {/* ── Tab: Quiz Results ──────────────────────────────── */}
         {activeTab === "quiz" && (
-          <div className="animate-fade-in">
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-primary" />
-                  ผลสอบนักเรียน (10 ครั้งล่าสุด)
-                </h3>
-                <span className="flex items-center gap-1 text-xs text-success">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
-                  Realtime
-                </span>
-              </div>
-              {recentQuizResults.length === 0 ? (
-                <div className="p-12 text-center">
-                  <BookOpen className="w-10 h-10 mx-auto text-muted-foreground opacity-30 mb-3" />
-                  <p className="text-muted-foreground text-sm">ยังไม่มีผลสอบ</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {recentQuizResults.map((q) => (
-                    <div key={q.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
-                      {/* Score badge */}
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0 ${
-                        q.score >= 80 ? "bg-emerald-500/10 text-emerald-600"
-                        : q.score >= 60 ? "bg-amber-500/10 text-amber-600"
-                        : "bg-red-500/10 text-red-600"
-                      }`}>
-                        {q.score}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {q.passed
-                            ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            : <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                          }
-                          <p className="text-sm font-medium text-foreground truncate">
-                            Quiz: {q.quiz_id.slice(0, 8)}…
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Course: {q.course_id.slice(0, 8)}…
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="flex items-center gap-1 text-xs text-amber-500 font-medium justify-end">
-                          <Zap className="w-3 h-3" />
-                          +{q.xp_earned} XP
-                        </div>
-                        {q.time_taken && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                            <Clock className="w-3 h-3" />
-                            {formatTime(q.time_taken)}
-                          </div>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {new Date(q.created_at).toLocaleDateString("th-TH")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div className="animate-fade-in rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" /> ผลสอบนักเรียน (10 ครั้งล่าสุด)
+              </h3>
+              <span className="flex items-center gap-1 text-xs text-success">
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Realtime
+              </span>
             </div>
+            {recentQuizResults.length === 0 ? (
+              <div className="p-12 text-center">
+                <BookOpen className="w-10 h-10 mx-auto text-muted-foreground opacity-30 mb-3" />
+                <p className="text-muted-foreground text-sm">ยังไม่มีผลสอบ</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {recentQuizResults.map((q) => (
+                  <div key={q.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0 ${
+                      q.score >= 80 ? "bg-emerald-500/10 text-emerald-600"
+                      : q.score >= 60 ? "bg-amber-500/10 text-amber-600"
+                      : "bg-red-500/10 text-red-600"
+                    }`}>{q.score}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {q.passed
+                          ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          : <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                        <p className="text-sm font-medium text-foreground truncate">Quiz: {q.quiz_id}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">Course: {q.course_id}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1 text-xs text-amber-500 font-medium justify-end">
+                        <Zap className="w-3 h-3" /> +{q.xp_earned} XP
+                      </div>
+                      {q.time_taken && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <Clock className="w-3 h-3" /> {formatTime(q.time_taken)}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(q.created_at).toLocaleDateString("th-TH")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* ── Tab: Transactions ──────────────────────────────── */}
         {activeTab === "transactions" && (
-          <div className="animate-fade-in">
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-primary" />
-                  รายการขายล่าสุด
-                </h3>
-                <span className="flex items-center gap-1 text-xs text-success">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
-                  Realtime
-                </span>
-              </div>
-              {recentTransactions.length === 0 ? (
-                <div className="p-12 text-center">
-                  <DollarSign className="w-10 h-10 mx-auto text-muted-foreground opacity-30 mb-3" />
-                  <p className="text-muted-foreground text-sm">ยังไม่มีรายการขาย</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {recentTransactions.map((txn) => (
-                    <div key={txn.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
-                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                        txn.status === "success" ? "bg-emerald-500"
-                        : txn.status === "pending" ? "bg-amber-500"
-                        : "bg-red-500"
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          Course: {txn.course_id.slice(0, 12)}…
-                        </p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {txn.payment_method ?? "—"} · {txn.status}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-sm font-bold ${txn.status === "success" ? "text-emerald-600" : "text-muted-foreground"}`}>
-                          {formatCurrency(txn.amount)}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {new Date(txn.created_at).toLocaleDateString("th-TH")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div className="animate-fade-in rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-primary" /> รายการขายล่าสุด
+              </h3>
+              <span className="flex items-center gap-1 text-xs text-success">
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Realtime
+              </span>
             </div>
+            {recentTransactions.length === 0 ? (
+              <div className="p-12 text-center">
+                <DollarSign className="w-10 h-10 mx-auto text-muted-foreground opacity-30 mb-3" />
+                <p className="text-muted-foreground text-sm">ยังไม่มีรายการขาย</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {recentTransactions.map((txn) => (
+                  <div key={txn.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors">
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                      txn.status === "success" ? "bg-emerald-500"
+                      : txn.status === "pending" ? "bg-amber-500"
+                      : "bg-red-500"
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">Course: {txn.course_id}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{txn.payment_method ?? "—"} · {txn.status}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-bold ${txn.status === "success" ? "text-emerald-600" : "text-muted-foreground"}`}>
+                        {formatCurrency(txn.amount)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(txn.created_at).toLocaleDateString("th-TH")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

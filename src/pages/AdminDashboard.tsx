@@ -4,17 +4,16 @@ import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminDashboard } from "@/hooks/useDashboard";
+import { useSessionGuard } from "@/hooks/useSessionGuard";
 import {
-  Users, DollarSign, TrendingUp, Activity,
-  RefreshCw, Loader2, ChevronUp, ShieldCheck,
-  BarChart2, Wifi, CreditCard, CheckCircle,
-  XCircle, Clock, AlertCircle
+  Users, DollarSign, TrendingUp, RefreshCw, Loader2,
+  ShieldCheck, BarChart2, Wifi, CreditCard,
+  CheckCircle, XCircle, Clock
 } from "lucide-react";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", minimumFractionDigits: 0 }).format(amount);
 
-// ── Mini Bar Chart (daily_stats) ──────────────────────────────
 const MiniBarChart = ({ data, field, color }: {
   data: { date: string; new_users: number; active_users: number; new_enrollments: number; revenue: number }[];
   field: "new_users" | "active_users" | "new_enrollments" | "revenue";
@@ -25,7 +24,7 @@ const MiniBarChart = ({ data, field, color }: {
   const max = Math.max(...values, 1);
   return (
     <div className="flex items-end gap-0.5 h-16">
-      {data.slice(-14).map((d, i) => (
+      {data.slice(-14).map((d) => (
         <div key={d.date} className="flex-1 group relative">
           <div
             className={`w-full rounded-sm transition-all duration-300 ${color}`}
@@ -40,32 +39,22 @@ const MiniBarChart = ({ data, field, color }: {
   );
 };
 
-// ── Status badge ──────────────────────────────────────────────
 const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { color: string; label: string }> = {
-    success: { color: "text-emerald-600 bg-emerald-500/10", label: "สำเร็จ" },
-    pending: { color: "text-amber-600 bg-amber-500/10", label: "รอดำเนินการ" },
-    failed:  { color: "text-red-600 bg-red-500/10", label: "ล้มเหลว" },
-    refunded:{ color: "text-blue-600 bg-blue-500/10", label: "คืนเงิน" },
+    success:  { color: "text-emerald-600 bg-emerald-500/10", label: "สำเร็จ" },
+    pending:  { color: "text-amber-600 bg-amber-500/10",    label: "รอดำเนินการ" },
+    failed:   { color: "text-red-600 bg-red-500/10",        label: "ล้มเหลว" },
+    refunded: { color: "text-blue-600 bg-blue-500/10",      label: "คืนเงิน" },
   };
   const s = map[status] ?? { color: "text-muted-foreground bg-muted", label: status };
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.color}`}>
-      {s.label}
-    </span>
-  );
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.color}`}>{s.label}</span>;
 };
 
 const AdminDashboard = () => {
   const { user, profile, signOut } = useAuth();
-  const {
-    onlineUsers,
-    recentTransactions,
-    dailyStats,
-    totalRevenue,
-    loading,
-    refetch,
-  } = useAdminDashboard();
+  const { onlineUsers, recentTransactions, dailyStats, totalRevenue, loading, refetch } = useAdminDashboard();
+
+  useSessionGuard(); // ✅ Single session enforcement
 
   const [graphMetric, setGraphMetric] = useState<"new_users" | "active_users" | "new_enrollments" | "revenue">("active_users");
 
@@ -73,17 +62,16 @@ const AdminDashboard = () => {
   const initials = displayName.charAt(0).toUpperCase();
   const avatarUrl = profile?.avatar_url;
 
-  // คำนวณ stats จาก dailyStats
   const last7 = dailyStats.slice(-7);
   const totalNewUsers7d = last7.reduce((s, d) => s + d.new_users, 0);
-  const totalEnroll7d = last7.reduce((s, d) => s + d.new_enrollments, 0);
-  const totalRev7d = last7.reduce((s, d) => s + Number(d.revenue), 0);
+  const totalEnroll7d   = last7.reduce((s, d) => s + d.new_enrollments, 0);
+  const totalRev7d      = last7.reduce((s, d) => s + Number(d.revenue), 0);
 
   const metricOptions = [
-    { key: "active_users" as const, label: "ผู้ใช้ Active", color: "bg-blue-500" },
-    { key: "new_users" as const, label: "ผู้ใช้ใหม่", color: "bg-violet-500" },
-    { key: "new_enrollments" as const, label: "สมัครเรียน", color: "bg-amber-500" },
-    { key: "revenue" as const, label: "รายได้", color: "bg-emerald-500" },
+    { key: "active_users"    as const, label: "ผู้ใช้ Active", color: "bg-blue-500" },
+    { key: "new_users"       as const, label: "ผู้ใช้ใหม่",   color: "bg-violet-500" },
+    { key: "new_enrollments" as const, label: "สมัครเรียน",   color: "bg-amber-500" },
+    { key: "revenue"         as const, label: "รายได้",       color: "bg-emerald-500" },
   ];
 
   if (loading) {
@@ -120,83 +108,40 @@ const AdminDashboard = () => {
                   <ShieldCheck className="w-3 h-3" /> Administrator
                 </span>
                 <span className="flex items-center gap-1 text-xs text-success">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
-                  Realtime
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Realtime
                 </span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={refetch} title="รีเฟรช">
-              <RefreshCw className="w-4 h-4" />
-            </Button>
+            <Button variant="ghost" size="sm" onClick={refetch}><RefreshCw className="w-4 h-4" /></Button>
             <Button variant="outline" size="sm" onClick={signOut}>ออกจากระบบ</Button>
           </div>
         </div>
 
         {/* ── KPI Cards ──────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Online users */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 relative overflow-hidden hover:shadow-md transition-all">
-            <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
-                <Wifi className="w-5 h-5 text-sky-500" />
+          {[
+            { icon: Wifi,        label: "ผู้ใช้ Online ตอนนี้", value: onlineUsers,              color: "sky",     live: true },
+            { icon: DollarSign,  label: "รายได้รวม",            value: formatCurrency(totalRevenue), color: "emerald", live: false },
+            { icon: Users,       label: "ผู้ใช้ใหม่ (7 วัน)",  value: totalNewUsers7d,          color: "violet",  live: false },
+            { icon: TrendingUp,  label: "สมัครเรียนใหม่ (7 วัน)", value: totalEnroll7d,         color: "amber",   live: false },
+          ].map((card) => (
+            <div key={card.label} className="rounded-2xl border border-border bg-card p-5 space-y-3 relative overflow-hidden hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <div className={`w-10 h-10 rounded-xl bg-${card.color}-500/10 flex items-center justify-center`}>
+                  <card.icon className={`w-5 h-5 text-${card.color}-500`} />
+                </div>
+                {card.live
+                  ? <span className="flex items-center gap-1 text-xs text-success font-medium"><span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Live</span>
+                  : <span className="text-xs text-muted-foreground">7 วัน</span>}
               </div>
-              <span className="flex items-center gap-1 text-xs text-success font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Live
-              </span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground">{onlineUsers}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">ผู้ใช้ Online ตอนนี้</p>
-            </div>
-          </div>
-
-          {/* รายได้รวม */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 relative overflow-hidden hover:shadow-md transition-all">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{card.label}</p>
               </div>
-              <span className="text-xs text-muted-foreground">ทั้งหมด</span>
             </div>
-            <div>
-              <p className="text-xl font-bold text-foreground">{formatCurrency(totalRevenue)}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">รายได้รวม</p>
-            </div>
-          </div>
-
-          {/* ผู้ใช้ใหม่ 7 วัน */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 relative overflow-hidden hover:shadow-md transition-all">
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-violet-500" />
-              </div>
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">7 วัน</span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground">{totalNewUsers7d}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">ผู้ใช้ใหม่</p>
-            </div>
-          </div>
-
-          {/* สมัครเรียน 7 วัน */}
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 relative overflow-hidden hover:shadow-md transition-all">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-amber-500" />
-              </div>
-              <span className="text-xs text-muted-foreground">7 วัน</span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground">{totalEnroll7d}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">สมัครเรียนใหม่</p>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* ── Daily Graph ────────────────────────────────────── */}
@@ -206,16 +151,13 @@ const AdminDashboard = () => {
               <BarChart2 className="w-4 h-4 text-primary" />
               <h2 className="font-semibold text-foreground text-sm">กราฟผู้ใช้รายวัน (14 วันล่าสุด)</h2>
             </div>
-            {/* Metric selector */}
             <div className="flex gap-1 bg-muted rounded-lg p-1">
               {metricOptions.map((m) => (
                 <button
                   key={m.key}
                   onClick={() => setGraphMetric(m.key)}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                    graphMetric === m.key
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                    graphMetric === m.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {m.label}
@@ -226,7 +168,7 @@ const AdminDashboard = () => {
 
           {dailyStats.length === 0 ? (
             <div className="h-20 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูล daily stats</p>
+              <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูล</p>
             </div>
           ) : (
             <>
@@ -235,7 +177,6 @@ const AdminDashboard = () => {
                 field={graphMetric}
                 color={metricOptions.find((m) => m.key === graphMetric)?.color ?? "bg-blue-500"}
               />
-              {/* X-axis dates */}
               <div className="flex gap-0.5 mt-1">
                 {dailyStats.slice(-14).map((d) => (
                   <div key={d.date} className="flex-1 text-center text-[9px] text-muted-foreground/60 truncate">
@@ -243,7 +184,6 @@ const AdminDashboard = () => {
                   </div>
                 ))}
               </div>
-              {/* Summary row */}
               <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "ผู้ใช้ Active", value: dailyStats.at(-1)?.active_users ?? 0, unit: "คน" },
@@ -268,15 +208,12 @@ const AdminDashboard = () => {
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-primary" />
-              ยอดขายล่าสุด
+              <CreditCard className="w-4 h-4 text-primary" /> ยอดขายล่าสุด
             </h3>
             <span className="flex items-center gap-1 text-xs text-success">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
-              Realtime
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Realtime
             </span>
           </div>
-
           {recentTransactions.length === 0 ? (
             <div className="p-12 text-center">
               <CreditCard className="w-10 h-10 mx-auto text-muted-foreground opacity-30 mb-3" />
@@ -291,17 +228,12 @@ const AdminDashboard = () => {
                     : txn.status === "pending" ? "bg-amber-500/10"
                     : "bg-red-500/10"
                   }`}>
-                    {txn.status === "success"
-                      ? <CheckCircle className="w-4 h-4 text-emerald-500" />
-                      : txn.status === "pending"
-                      ? <Clock className="w-4 h-4 text-amber-500" />
-                      : <XCircle className="w-4 h-4 text-red-500" />
-                    }
+                    {txn.status === "success" ? <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    : txn.status === "pending" ? <Clock className="w-4 h-4 text-amber-500" />
+                    : <XCircle className="w-4 h-4 text-red-500" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      Course: {txn.course_id.slice(0, 16)}…
-                    </p>
+                    <p className="text-sm font-medium text-foreground truncate">Course: {txn.course_id}</p>
                     <p className="text-xs text-muted-foreground capitalize">
                       {txn.payment_method ?? "—"} · {new Date(txn.created_at).toLocaleDateString("th-TH")}
                     </p>
@@ -317,7 +249,6 @@ const AdminDashboard = () => {
             </div>
           )}
         </div>
-
       </div>
       <Footer />
     </div>
