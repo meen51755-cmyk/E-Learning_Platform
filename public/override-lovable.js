@@ -1,5 +1,5 @@
 // วางไฟล์นี้ที่ /public/override-lovable.js
-// AGGRESSIVE FAVICON OVERRIDE FOR LOVABLE PLATFORM
+// FIXED: ไม่มี cache busting + ไม่โหลดซ้ำ
 
 (function() {
   'use strict';
@@ -9,14 +9,26 @@
   const LEARNHUB_FAVICON = '/favicon.svg';
   const LEARNHUB_TITLE = 'LearnHub - แพลตฟอร์มเรียนออนไลน์คุณภาพสูง';
   
-  // ฟังก์ชันเปลี่ยน Favicon
+  let faviconUpdated = false; // ป้องกันอัปเดตซ้ำ
+  
+  // ฟังก์ชันเปลี่ยน Favicon (ไม่มี cache busting)
   function updateFavicon() {
+    // ถ้าอัปเดตแล้ว ไม่ต้องทำซ้ำ
+    if (faviconUpdated) return;
+    
     // ลบ Lovable favicons ทั้งหมด
     const lovableIcons = document.querySelectorAll('link[rel*="icon"][href*="lovable"]');
     lovableIcons.forEach(icon => {
       console.log('🗑️ Removing Lovable icon:', icon.href);
       icon.remove();
     });
+    
+    // เช็คว่ามี LearnHub favicon แล้วหรือยัง
+    const existingIcon = document.querySelector(`link[rel="icon"][href="${LEARNHUB_FAVICON}"]`);
+    if (existingIcon) {
+      faviconUpdated = true;
+      return;
+    }
     
     // ลบ icon ทั้งหมดที่ไม่ใช่ LearnHub
     const allIcons = document.querySelectorAll('link[rel*="icon"]');
@@ -26,26 +38,20 @@
       }
     });
     
-    // สร้าง LearnHub favicon
+    // สร้าง LearnHub favicon (ไม่มี ?t=)
     const link = document.createElement('link');
     link.rel = 'icon';
     link.type = 'image/svg+xml';
-    link.href = LEARNHUB_FAVICON + '?t=' + Date.now();
+    link.href = LEARNHUB_FAVICON; // ← ลบ ?t= ออก!
     document.head.appendChild(link);
     
-    // สร้าง shortcut icon
-    const shortcut = document.createElement('link');
-    shortcut.rel = 'shortcut icon';
-    shortcut.type = 'image/svg+xml';
-    shortcut.href = LEARNHUB_FAVICON + '?t=' + Date.now();
-    document.head.appendChild(shortcut);
-    
-    console.log('✅ LearnHub favicon installed');
+    faviconUpdated = true;
+    console.log('✅ LearnHub favicon installed (no cache busting)');
   }
   
   // ฟังก์ชันเปลี่ยน Title
   function updateTitle() {
-    if (document.title.includes('Lovable')) {
+    if (document.title !== LEARNHUB_TITLE) {
       document.title = LEARNHUB_TITLE;
       console.log('✅ Title updated to:', LEARNHUB_TITLE);
     }
@@ -55,7 +61,7 @@
   function updateMetaTags() {
     // อัพเดท og:title
     const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle && ogTitle.content.includes('Lovable')) {
+    if (ogTitle && ogTitle.content !== LEARNHUB_TITLE) {
       ogTitle.content = LEARNHUB_TITLE;
     }
     
@@ -86,7 +92,7 @@
     });
   }
   
-  // Execute on window load
+  // Execute on window load (เช็คครั้งสุดท้าย)
   window.addEventListener('load', function() {
     updateFavicon();
     updateTitle();
@@ -98,15 +104,16 @@
     mutations.forEach(function(mutation) {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach(function(node) {
-          // ถ้าเป็น link tag ที่เพิ่มเข้ามา
-          if (node.tagName === 'LINK' && node.rel.includes('icon')) {
-            if (node.href.includes('lovable') || !node.href.includes('favicon.svg')) {
+          // ถ้าเป็น link tag ที่ Lovable เพิ่มเข้ามา
+          if (node.tagName === 'LINK' && node.rel && node.rel.includes('icon')) {
+            if (node.href.includes('lovable')) {
               console.log('🚫 Blocking Lovable icon injection');
               node.remove();
+              updateFavicon();
             }
           }
           
-          // ถ้าเป็น meta tag
+          // ถ้าเป็น meta tag ของ Lovable
           if (node.tagName === 'META') {
             if (node.content && node.content.includes('lovable')) {
               console.log('🚫 Blocking Lovable meta tag');
@@ -116,10 +123,10 @@
         });
       }
       
-      // ถ้า title เปลี่ยน
-      if (mutation.type === 'characterData' || mutation.type === 'childList') {
-        if (mutation.target === document.querySelector('title') || 
-            mutation.target.parentNode === document.querySelector('title')) {
+      // ถ้า title เปลี่ยนเป็น Lovable
+      if (mutation.target === document.querySelector('title') || 
+          (mutation.target.parentNode && mutation.target.parentNode === document.querySelector('title'))) {
+        if (document.title.includes('Lovable')) {
           updateTitle();
         }
       }
@@ -133,11 +140,8 @@
     characterData: true
   });
   
-  // Double check ทุก 2 วินาที (aggressive!)
-  setInterval(function() {
-    updateFavicon();
-    updateTitle();
-  }, 2000);
+  // ลบ setInterval ออก! ไม่ต้องเช็คซ้ำ
+  // observer จะดูแลให้แล้ว
   
-  console.log('%c✅ LearnHub branding active - watching for changes', 'color: #10b981; font-weight: bold');
+  console.log('%c✅ LearnHub branding active (optimized)', 'color: #10b981; font-weight: bold');
 })();

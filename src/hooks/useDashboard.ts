@@ -9,7 +9,7 @@ export interface Enrollment {
   progress: number;
   completed: boolean;
   enrolled_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface QuizResult {
