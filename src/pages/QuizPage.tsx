@@ -9,8 +9,11 @@ import { sampleCourses } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Timer, AlertTriangle, CheckCircle, XCircle,
-  ArrowRight, ArrowLeft, Flag, ShieldAlert
+  ArrowRight, ArrowLeft, Flag, ShieldAlert, Loader2
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuditLog } from "@/hooks/useAuditLog";
+import { checkRateLimit } from "@/lib/sanitize";
 
 const QuizPage = () => {
   const { id } = useParams(); // quiz id
@@ -33,6 +36,12 @@ const QuizPage = () => {
     quizData?.timeLimit ? quizData.timeLimit * 60 : 1800
   );
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [grading, setGrading] = useState(false);
+  const [serverResult, setServerResult] = useState<{
+    percentage: number; passed: boolean; xp_earned: number;
+  } | null>(null);
+  const startTime = useState(() => Date.now())[0];
+  const { log } = useAuditLog();
 
   // ── Anti-Cheat: Tab Switch ─────────────────────────────────
   useEffect(() => {
@@ -41,6 +50,7 @@ const QuizPage = () => {
       if (document.hidden) {
         setTabSwitchCount((prev) => {
           const next = prev + 1;
+          log("tab_switch_detected", { quiz_id: id, count: next });
           if (next >= 3) setSubmitted(true);
           return next;
         });
@@ -67,9 +77,64 @@ const QuizPage = () => {
     document.documentElement.requestFullscreen?.().catch(() => {});
   };
 
-  // ── ส่งคำตอบ (TODO: บันทึกลง Supabase) ────────────────────
+  // ── ส่งคำตอบ — server-side grading ────────────────────────
   const handleSubmit = async () => {
-    // TODO: await supabase.from('quiz_attempts').insert({ user_id: user.id, quiz_id: id, answers, score: percentage })
+    if (!user) return;
+
+    // ✅ rate limit — ส่งได้ 5 ครั้ง/ชั่วโมง ป้องกัน spam
+    const rate = checkRateLimit(`quiz-submit-${id}-${user.id}`, 5, 3600000);
+    if (!rate.allowed) {
+      return;
+    }
+
+    setGrading(true);
+
+    // คำนวณคะแนน client-side ก่อน (จะ validate อีกครั้งฝั่ง server)
+    const clientScore = questions.reduce((acc, q) =>
+      acc + (answers[q.id] === q.correctAnswer ? 1 : 0), 0
+    );
+    const clientPercentage = Math.round((clientScore / questions.length) * 100);
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+
+    try {
+      // ✅ ส่งไป grade ฝั่ง server — cast any เพราะ Supabase types ยังไม่รู้จัก grade_quiz
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("grade_quiz", {
+        p_user_id: user.id,
+        p_quiz_id: id || "q1",
+        p_course_id: "1",
+        p_answers: { ...answers, client_percentage: clientPercentage },
+        p_time_taken: timeTaken,
+        p_tab_switches: tabSwitchCount,
+      });
+
+      const result = data as { percentage: number; passed: boolean; xp_earned: number } | null;
+
+      if (!error && result) {
+        setServerResult(result);
+        log(result.passed ? "quiz_passed" : "quiz_failed", {
+          quiz_id: id,
+          percentage: result.percentage,
+          xp_earned: result.xp_earned,
+        });
+      } else {
+        // fallback ใช้ client score
+        setServerResult({
+          percentage: clientPercentage,
+          passed: clientPercentage >= 70,
+          xp_earned: clientPercentage >= 70 ? 100 : 30,
+        });
+        log("quiz_submitted", { quiz_id: id, percentage: clientPercentage });
+      }
+    } catch {
+      setServerResult({
+        percentage: clientPercentage,
+        passed: clientPercentage >= 70,
+        xp_earned: clientPercentage >= 70 ? 100 : 30,
+      });
+    }
+
+    setGrading(false);
     setSubmitted(true);
   };
 
@@ -143,7 +208,9 @@ const QuizPage = () => {
 
   // ── หน้าผลลัพธ์ ────────────────────────────────────────────
   if (submitted) {
-    const passed = percentage >= 70;
+    const resultPercentage = serverResult?.percentage ?? percentage;
+    const passed = serverResult?.passed ?? (percentage >= 70);
+    const xpEarned = serverResult?.xp_earned ?? 0;
     return (
       <div className="min-h-screen bg-background flex items-center justify-center container-padding">
         <div className="card-elevated p-8 max-w-lg w-full text-center space-y-6 animate-scale-in">
@@ -156,8 +223,11 @@ const QuizPage = () => {
           <h1 className="text-2xl font-display font-bold text-foreground">
             {passed ? "ยินดีด้วย! คุณผ่าน! 🎉" : "เสียใจด้วย ลองอีกครั้งนะ"}
           </h1>
-          <div className="text-5xl font-bold text-primary">{percentage}%</div>
+          <div className="text-5xl font-bold text-primary">{resultPercentage}%</div>
           <p className="text-muted-foreground">คะแนน {score}/{questions.length} ข้อ</p>
+          {xpEarned > 0 && (
+            <p className="text-sm text-success font-medium">+{xpEarned} XP ✨</p>
+          )}
 
           {/* Review */}
           <div className="text-left space-y-3 max-h-64 overflow-y-auto">
@@ -290,8 +360,11 @@ const QuizPage = () => {
               ข้อถัดไป <ArrowRight className="w-4 h-4" />
             </Button>
           ) : (
-            <Button variant="hero" onClick={handleSubmit}>
-              ส่งคำตอบ <Flag className="w-4 h-4" />
+            <Button variant="hero" onClick={handleSubmit} disabled={grading}>
+              {grading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> กำลังตรวจ...</>
+                : <>ส่งคำตอบ <Flag className="w-4 h-4" /></>
+              }
             </Button>
           )}
         </div>

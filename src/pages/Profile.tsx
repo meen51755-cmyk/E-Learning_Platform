@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validators, validateImageFile, checkRateLimit, sanitizeText } from "@/lib/sanitize";
+import { useAuditLog } from "@/hooks/useAuditLog";
+import { usePasswordHistory } from "@/hooks/usePasswordHistory";
 import {
   User, Lock, Shield, Bell, Globe,
   Camera, Save, Smartphone, Loader2, Eye, EyeOff,
@@ -15,6 +17,8 @@ import {
 
 const Profile = () => {
   const { user, profile, refreshProfile } = useAuth();
+  const { log } = useAuditLog();
+  const { checkPasswordHistory, savePasswordHistory } = usePasswordHistory();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,6 +111,7 @@ const Profile = () => {
     } else {
       setAvatarUrl(publicUrl);
       await refreshProfile();
+      log("avatar_uploaded");
       toast({ title: "อัปเดตรูปโปรไฟล์สำเร็จ ✓" });
     }
     setUploadingAvatar(false);
@@ -193,6 +198,7 @@ const Profile = () => {
       });
     } else {
       await refreshProfile();
+      log("profile_updated", { fields: ["full_name", "bio"] });
       toast({ title: "บันทึกข้อมูลสำเร็จ ✓" });
     }
   };
@@ -230,6 +236,13 @@ const Profile = () => {
       return;
     }
 
+    // ✅ ตรวจ password history — ห้ามซ้ำ 5 ครั้งล่าสุด
+    const historyCheck = await checkPasswordHistory(newPassword);
+    if (!historyCheck.ok) {
+      toast({ title: historyCheck.error, variant: "destructive" });
+      return;
+    }
+
     setSavingPassword(true);
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -239,6 +252,7 @@ const Profile = () => {
 
     if (signInError) {
       setSavingPassword(false);
+      log("password_change_failed", { reason: "wrong_old_password" });
       toast({
         title: "รหัสผ่านเก่าไม่ถูกต้อง",
         description: "กรุณาตรวจสอบรหัสผ่านเก่าอีกครั้ง",
@@ -254,6 +268,8 @@ const Profile = () => {
       toast({ title: "เปลี่ยนรหัสผ่านไม่สำเร็จ", description: error.message, variant: "destructive" });
     } else {
       setOldPassword(""); setNewPassword(""); setConfirmPassword("");
+      await savePasswordHistory(newPassword);
+      log("password_changed");
       toast({ title: "เปลี่ยนรหัสผ่านสำเร็จ ✓" });
     }
   };
