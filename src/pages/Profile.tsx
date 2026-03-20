@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { validators, validateImageFile, checkRateLimit, sanitizeText } from "@/lib/sanitize";
 import {
   User, Lock, Shield, Bell, Globe,
   Camera, Save, Smartphone, Loader2, Eye, EyeOff,
@@ -65,13 +66,24 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "ไฟล์ใหญ่เกินไป", description: "กรุณาเลือกไฟล์ไม่เกิน 2MB", variant: "destructive" });
+    // ✅ validate ไฟล์ด้วย sanitize utility
+    const fileCheck = validateImageFile(file);
+    if (!fileCheck.ok) {
+      toast({ title: fileCheck.error, variant: "destructive" });
+      return;
+    }
+
+    // ✅ rate limit — อัปโหลดได้ไม่เกิน 3 ครั้ง/นาที
+    const rate = checkRateLimit(`avatar-upload-${user.id}`, 3, 60000);
+    if (!rate.allowed) {
+      toast({ title: "อัปโหลดถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
       return;
     }
 
     setUploadingAvatar(true);
-    const filePath = `avatars/${user.id}/${Date.now()}_${file.name}`;
+    // ✅ sanitize filename — ลบอักขระอันตรายออก
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `avatars/${user.id}/${Date.now()}_${safeFileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
@@ -111,40 +123,63 @@ const Profile = () => {
   // ── บันทึกข้อมูลส่วนตัว ────────────────────────────────────
   const handleSaveProfile = async () => {
     if (!user) return;
-    if (!fullName.trim()) {
-      toast({ title: "กรุณากรอกชื่อ", variant: "destructive" });
+
+    // ✅ rate limit — บันทึกได้ไม่เกิน 5 ครั้ง/นาที
+    const rate = checkRateLimit(`save-profile-${user.id}`, 5, 60000);
+    if (!rate.allowed) {
+      toast({ title: "บันทึกถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
       return;
     }
 
-    // ตรวจเบอร์โทร (ถ้ากรอก)
-    const phoneDigits = phone.replace(/\D/g, "");
-    if (phone && phoneDigits.length !== 10) {
-      toast({ title: "เบอร์โทรต้องมี 10 หลัก", variant: "destructive" });
+    // ✅ validate ทุก field ด้วย validators
+    const nameCheck = validators.fullName(fullName);
+    if (!nameCheck.ok) {
+      toast({ title: nameCheck.error, variant: "destructive" });
       return;
     }
+
+    const phoneCheck = validators.phone(phone);
+    if (!phoneCheck.ok) {
+      toast({ title: phoneCheck.error, variant: "destructive" });
+      return;
+    }
+
+    const websiteCheck = validators.url(website);
+    if (!websiteCheck.ok) {
+      toast({ title: `เว็บไซต์: ${websiteCheck.error}`, variant: "destructive" });
+      return;
+    }
+
+    const fbCheck = validators.url(facebook);
+    if (!fbCheck.ok) {
+      toast({ title: `Facebook: ${fbCheck.error}`, variant: "destructive" });
+      return;
+    }
+
+    const ytCheck = validators.url(youtube);
+    if (!ytCheck.ok) {
+      toast({ title: `YouTube: ${ytCheck.error}`, variant: "destructive" });
+      return;
+    }
+
+    // ✅ sanitize bio
+    const bioCheck = validators.bio(bio);
 
     setSavingProfile(true);
 
-    // 1. อัปเดต profiles table
     const { error: profileError } = await supabase
       .from("profiles")
       .update({
-        full_name: fullName.trim(),
-        bio: bio.trim(),
-        // TODO: เพิ่ม column เหล่านี้ใน migration แล้วค่อย uncomment
-        // phone: phoneDigits || null,
-        // website: website.trim() || null,
-        // facebook: facebook.trim() || null,
-        // youtube: youtube.trim() || null,
+        full_name: nameCheck.value,
+        bio: bioCheck.value,
       })
       .eq("user_id", user.id);
 
-    // 2. อัปเดต auth metadata → Supabase Dashboard แสดงชื่อถูกต้อง
     const { error: authError } = await supabase.auth.updateUser({
       data: {
-        full_name: fullName.trim(),
-        display_name: fullName.trim(),
-        phone: phoneDigits || undefined,
+        full_name: nameCheck.value,
+        display_name: nameCheck.value,
+        phone: phoneCheck.value || undefined,
       },
     });
 
@@ -164,14 +199,28 @@ const Profile = () => {
 
   // ── เปลี่ยนรหัสผ่าน ────────────────────────────────────────
   const handleChangePassword = async () => {
+    if (!user) return;
+
+    // ✅ rate limit — เปลี่ยนรหัสผ่านได้ไม่เกิน 3 ครั้ง/5 นาที
+    const rate = checkRateLimit(`change-password-${user.id}`, 3, 300000);
+    if (!rate.allowed) {
+      const mins = Math.ceil((rate.remainingMs ?? 0) / 60000);
+      toast({ title: `ลองใหม่ในอีก ${mins} นาที`, variant: "destructive" });
+      return;
+    }
+
     if (!oldPassword || !newPassword || !confirmPassword) {
       toast({ title: "กรุณากรอกข้อมูลให้ครบทุกช่อง", variant: "destructive" });
       return;
     }
-    if (newPassword.length < 8) {
-      toast({ title: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร", variant: "destructive" });
+
+    // ✅ validate รหัสผ่านใหม่
+    const passCheck = validators.password(newPassword);
+    if (!passCheck.ok) {
+      toast({ title: passCheck.error, variant: "destructive" });
       return;
     }
+
     if (newPassword !== confirmPassword) {
       toast({ title: "รหัสผ่านใหม่ไม่ตรงกัน", variant: "destructive" });
       return;

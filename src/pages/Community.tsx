@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { validators, checkRateLimit } from "@/lib/sanitize";
 import { MessageSquare, Star, ThumbsUp, Send, Search, Plus } from "lucide-react";
 
 const discussions = [
@@ -52,21 +53,41 @@ const Community = () => {
   );
 
   const handleSendMessage = () => {
-    if (!messageText.trim()) return;
     if (!user) {
       toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
       return;
     }
+
+    // ✅ validate ข้อความ
+    const msgCheck = validators.message(messageText);
+    if (!msgCheck.ok) {
+      toast({ title: msgCheck.error, variant: "destructive" });
+      return;
+    }
+
+    // ✅ rate limit — ส่งได้ไม่เกิน 10 ข้อความ/นาที
+    const rate = checkRateLimit(`message-${user.id}`, 10, 60000);
+    if (!rate.allowed) {
+      toast({ title: "ส่งข้อความถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
+      return;
+    }
+
     const now = new Date();
     const time = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
-    setMessages((prev) => [...prev, { from: "me", text: messageText.trim(), time }]);
+    setMessages((prev) => [...prev, { from: "me", text: msgCheck.value!, time }]);
     setMessageText("");
-    // TODO: supabase.from('messages').insert({ sender_id: user.id, content: messageText })
+    // TODO: supabase.from('messages').insert({ sender_id: user.id, content: msgCheck.value })
   };
 
   const handleLike = (id: string) => {
     if (!user) {
       toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
+      return;
+    }
+    // ✅ rate limit — ไลก์ได้ไม่เกิน 20 ครั้ง/นาที
+    const rate = checkRateLimit(`like-${user.id}`, 20, 60000);
+    if (!rate.allowed) {
+      toast({ title: "ไลก์ถี่เกินไป", variant: "destructive" });
       return;
     }
     setLikedPosts((prev) =>
@@ -77,6 +98,12 @@ const Community = () => {
   const handleNewPost = () => {
     if (!user) {
       toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
+      return;
+    }
+    // ✅ rate limit — สร้างโพสต์ได้ไม่เกิน 3 ครั้ง/นาที
+    const rate = checkRateLimit(`new-post-${user.id}`, 3, 60000);
+    if (!rate.allowed) {
+      toast({ title: "สร้างโพสต์ถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
       return;
     }
     toast({ title: "ฟีเจอร์นี้กำลังพัฒนา" });
