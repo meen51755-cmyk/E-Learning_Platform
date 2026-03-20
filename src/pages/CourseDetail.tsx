@@ -5,23 +5,46 @@ import Footer from "@/components/layout/Footer";
 import { sampleCourses } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuditLog } from "@/hooks/useAuditLog";
+import { checkRateLimit } from "@/lib/sanitize";
 import {
   Star, Users, Clock, PlayCircle, BookOpen, Award,
   ChevronDown, ChevronRight, FileText, Video, File,
-  CheckCircle, ArrowRight, Lock
+  CheckCircle, ArrowRight, Lock, Loader2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const CourseDetail = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { log } = useAuditLog();
 
   const course = sampleCourses.find((c) => c.id === id) || sampleCourses[0];
   const [expandedModules, setExpandedModules] = useState<string[]>([
     course.modules[0]?.id || "",
   ]);
+  const [enrolling, setEnrolling] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [checkingEnroll, setCheckingEnroll] = useState(true);
+
+  // ── เช็คว่า user สมัครแล้วหรือยัง ──────────────────────────
+  useEffect(() => {
+    const checkEnrollment = async () => {
+      if (!user) { setCheckingEnroll(false); return; }
+      const { data } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("course_id", course.id)
+        .single();
+      setIsEnrolled(!!data);
+      setCheckingEnroll(false);
+    };
+    checkEnrollment();
+  }, [user, course.id]);
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>
@@ -31,8 +54,8 @@ const CourseDetail = () => {
     );
   };
 
-  // ── ปุ่ม Enroll / เริ่มเรียน ──────────────────────────────
-  const handleEnroll = () => {
+  // ── Enroll จริงลง Supabase ────────────────────────────────
+  const handleEnroll = async () => {
     if (!user) {
       toast({
         title: "กรุณาเข้าสู่ระบบก่อน",
@@ -42,21 +65,78 @@ const CourseDetail = () => {
       navigate("/login", { state: { from: `/courses/${course.id}` } });
       return;
     }
-    // TODO: เรียก Supabase เพื่อสร้าง enrollment เมื่อมี course จริง
+
+    // สมัครแล้ว → ไปเรียนเลย
+    if (isEnrolled) {
+      navigate(`/learn/${course.id}`);
+      return;
+    }
+
+    // คอร์สมีค่าใช้จ่าย → ไปหน้า Payment
+    if (!course.isFree) {
+      navigate(`/payment?course=${course.id}`);
+      return;
+    }
+
+    // ✅ rate limit
+    const rate = checkRateLimit(`enroll-${user.id}`, 10, 3600000);
+    if (!rate.allowed) {
+      toast({ title: "สมัครถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
+      return;
+    }
+
+    setEnrolling(true);
+
+    // ✅ บันทึก enrollment ลง Supabase
+    const { error } = await supabase
+      .from("enrollments")
+      .insert({ user_id: user.id, course_id: course.id, progress: 0, completed: false });
+
+    if (error) {
+      if (error.code === "23505") {
+        setIsEnrolled(true);
+        navigate(`/learn/${course.id}`);
+        return;
+      }
+      toast({ title: "สมัครไม่สำเร็จ", description: error.message, variant: "destructive" });
+      setEnrolling(false);
+      return;
+    }
+
+    // ✅ บันทึก notification
+    await supabase.from("notifications").insert({
+      user_id: user.id,
+      type: "new_course",
+      title: `✅ ลงทะเบียนสำเร็จ!`,
+      message: `คุณได้ลงทะเบียนคอร์ส "${course.title}" แล้ว`,
+      link: `/learn/${course.id}`,
+    });
+
+    log("register_success", { action: "course_enrolled", course_id: course.id });
+
+    setIsEnrolled(true);
+    setEnrolling(false);
+    toast({ title: "ลงทะเบียนสำเร็จ! 🎉", description: `ยินดีต้อนรับสู่คอร์ส ${course.title}` });
     navigate(`/learn/${course.id}`);
   };
 
   const lessonIcons = { video: Video, article: FileText, pdf: File };
 
+  const enrollBtnLabel = () => {
+    if (checkingEnroll) return <><Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลด...</>;
+    if (enrolling) return <><Loader2 className="w-4 h-4 animate-spin" /> กำลังสมัคร...</>;
+    if (isEnrolled) return <>เรียนต่อ <ArrowRight className="w-4 h-4" /></>;
+    if (course.isFree) return <>เริ่มเรียนเลย <ArrowRight className="w-4 h-4" /></>;
+    return <>ลงทะเบียนเรียน <ArrowRight className="w-4 h-4" /></>;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
       <div className="relative py-12" style={{ background: "var(--hero-gradient)" }}>
         <div className="container mx-auto container-padding">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left: info */}
             <div className="lg:col-span-2 space-y-4 text-primary-foreground">
               <div className="flex items-center gap-2 text-sm opacity-80">
                 <Link to="/courses" className="hover:underline">คอร์สเรียน</Link>
@@ -87,13 +167,16 @@ const CourseDetail = () => {
               </div>
             </div>
 
-            {/* Right: Enroll card */}
             <div className="card-elevated p-6 space-y-4 self-start">
               <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                 <PlayCircle className="w-16 h-16 text-primary" />
               </div>
               <div className="text-center">
-                {course.isFree ? (
+                {isEnrolled ? (
+                  <div className="text-sm font-medium text-success flex items-center justify-center gap-1">
+                    <CheckCircle className="w-4 h-4" /> ลงทะเบียนแล้ว
+                  </div>
+                ) : course.isFree ? (
                   <div className="text-2xl font-bold text-success">ฟรี</div>
                 ) : (
                   <div className="text-2xl font-bold text-foreground">
@@ -102,58 +185,49 @@ const CourseDetail = () => {
                 )}
               </div>
 
-              <Button variant="hero" size="lg" className="w-full" onClick={handleEnroll}>
-                {course.isFree ? "เริ่มเรียนเลย" : "ลงทะเบียนเรียน"}
-                <ArrowRight className="w-4 h-4" />
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full"
+                onClick={handleEnroll}
+                disabled={enrolling || checkingEnroll}
+              >
+                {enrollBtnLabel()}
               </Button>
 
-              {/* แสดง hint ถ้ายังไม่ login */}
               {!user && (
                 <p className="text-xs text-center text-muted-foreground">
                   <Lock className="w-3 h-3 inline mr-1" />
                   ต้อง{" "}
-                  <Link to="/login" className="text-primary hover:underline">
-                    เข้าสู่ระบบ
-                  </Link>{" "}
-                  ก่อนลงทะเบียน
+                  <Link to="/login" className="text-primary hover:underline">เข้าสู่ระบบ</Link>
+                  {" "}ก่อนลงทะเบียน
                 </p>
               )}
 
               <div className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-success" /> เข้าถึงเนื้อหาตลอดชีพ
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-success" /> Certificate เมื่อเรียนจบ
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-success" /> แบบทดสอบท้ายบท
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-success" /> เอกสารประกอบดาวน์โหลด
-                </div>
+                {[
+                  "เข้าถึงเนื้อหาตลอดชีพ",
+                  "Certificate เมื่อเรียนจบ",
+                  "แบบทดสอบท้ายบท",
+                  "เอกสารประกอบดาวน์โหลด",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-success" /> {item}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Content ──────────────────────────────────────────── */}
       <div className="container mx-auto container-padding py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            {/* สิ่งที่จะได้เรียนรู้ */}
             <div className="card-elevated p-6">
-              <h2 className="text-xl font-display font-bold text-foreground mb-4">
-                สิ่งที่จะได้เรียนรู้
-              </h2>
+              <h2 className="text-xl font-display font-bold text-foreground mb-4">สิ่งที่จะได้เรียนรู้</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  "เข้าใจพื้นฐานอย่างแน่น",
-                  "ปฏิบัติจริงผ่านโปรเจกต์",
-                  "เตรียมพร้อมสู่การทำงาน",
-                  "ได้ Certificate รับรอง",
-                ].map((item, i) => (
+                {["เข้าใจพื้นฐานอย่างแน่น","ปฏิบัติจริงผ่านโปรเจกต์","เตรียมพร้อมสู่การทำงาน","ได้ Certificate รับรอง"].map((item, i) => (
                   <div key={i} className="flex items-start gap-2">
                     <CheckCircle className="w-5 h-5 text-success shrink-0 mt-0.5" />
                     <span className="text-sm text-foreground">{item}</span>
@@ -162,12 +236,8 @@ const CourseDetail = () => {
               </div>
             </div>
 
-            {/* Curriculum */}
             <div>
-              <h2 className="text-xl font-display font-bold text-foreground mb-4">
-                เนื้อหาคอร์ส
-              </h2>
-
+              <h2 className="text-xl font-display font-bold text-foreground mb-4">เนื้อหาคอร์ส</h2>
               {course.modules.length === 0 ? (
                 <div className="card-elevated p-8 text-center text-muted-foreground">
                   <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -182,18 +252,12 @@ const CourseDetail = () => {
                         className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          {expandedModules.includes(module.id) ? (
-                            <ChevronDown className="w-5 h-5 text-primary" />
-                          ) : (
-                            <ChevronRight className="w-5 h-5" />
-                          )}
-                          <span className="font-medium text-foreground text-left">
-                            {module.title}
-                          </span>
+                          {expandedModules.includes(module.id)
+                            ? <ChevronDown className="w-5 h-5 text-primary" />
+                            : <ChevronRight className="w-5 h-5" />}
+                          <span className="font-medium text-foreground text-left">{module.title}</span>
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                          {module.lessons.length} บทเรียน
-                        </span>
+                        <span className="text-sm text-muted-foreground">{module.lessons.length} บทเรียน</span>
                       </button>
 
                       {expandedModules.includes(module.id) && (
@@ -201,29 +265,16 @@ const CourseDetail = () => {
                           {module.lessons.map((lesson) => {
                             const LessonIcon = lessonIcons[lesson.type];
                             return (
-                              <div
-                                key={lesson.id}
-                                className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors"
-                              >
+                              <div key={lesson.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors">
                                 <div className="flex items-center gap-3">
-                                  {lesson.completed ? (
-                                    <CheckCircle className="w-4 h-4 text-success" />
-                                  ) : (
-                                    <LessonIcon className="w-4 h-4 text-muted-foreground" />
-                                  )}
-                                  <span
-                                    className={`text-sm ${
-                                      lesson.completed
-                                        ? "text-muted-foreground"
-                                        : "text-foreground"
-                                    }`}
-                                  >
+                                  {lesson.completed
+                                    ? <CheckCircle className="w-4 h-4 text-success" />
+                                    : <LessonIcon className="w-4 h-4 text-muted-foreground" />}
+                                  <span className={`text-sm ${lesson.completed ? "text-muted-foreground" : "text-foreground"}`}>
                                     {lesson.title}
                                   </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {lesson.duration}
-                                </span>
+                                <span className="text-xs text-muted-foreground">{lesson.duration}</span>
                               </div>
                             );
                           })}
@@ -231,13 +282,9 @@ const CourseDetail = () => {
                             <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-t border-border">
                               <div className="flex items-center gap-3">
                                 <Award className="w-4 h-4 text-primary" />
-                                <span className="text-sm font-medium text-primary">
-                                  {module.quiz.title}
-                                </span>
+                                <span className="text-sm font-medium text-primary">{module.quiz.title}</span>
                               </div>
-                              <span className="text-xs text-muted-foreground">
-                                {module.quiz.questions.length} ข้อ
-                              </span>
+                              <span className="text-xs text-muted-foreground">{module.quiz.questions.length} ข้อ</span>
                             </div>
                           )}
                         </div>
@@ -249,18 +296,12 @@ const CourseDetail = () => {
             </div>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <div className="card-elevated p-6 space-y-4">
               <h3 className="font-display font-bold text-foreground">Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {course.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1 bg-muted rounded-full text-xs text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
+                  <span key={tag} className="px-3 py-1 bg-muted rounded-full text-xs text-muted-foreground">{tag}</span>
                 ))}
               </div>
             </div>
