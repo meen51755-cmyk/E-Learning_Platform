@@ -7,6 +7,7 @@ import { BookOpen, Mail, Lock, User, Eye, EyeOff, ArrowRight } from "lucide-reac
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { validators, checkRateLimit } from "@/lib/sanitize";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -44,21 +45,39 @@ const Register = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!fullName || !email || !password) {
-      toast({ title: "กรุณากรอกข้อมูลให้ครบ", variant: "destructive" });
+    // ✅ rate limit — สมัครได้ไม่เกิน 5 ครั้ง/10 นาที ป้องกัน bot
+    const rate = checkRateLimit("register", 5, 600000);
+    if (!rate.allowed) {
+      toast({ title: "ลองใหม่ในอีก 10 นาที", variant: "destructive" });
       return;
     }
-    if (password.length < 8) {
-      toast({ title: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร", variant: "destructive" });
+
+    // ✅ validate ทุก field
+    const nameCheck = validators.fullName(fullName);
+    if (!nameCheck.ok) {
+      toast({ title: nameCheck.error, variant: "destructive" });
       return;
     }
+
+    const emailCheck = validators.email(email);
+    if (!emailCheck.ok) {
+      toast({ title: emailCheck.error, variant: "destructive" });
+      return;
+    }
+
+    const passCheck = validators.password(password);
+    if (!passCheck.ok) {
+      toast({ title: passCheck.error, variant: "destructive" });
+      return;
+    }
+
     if (!agreed) {
       toast({ title: "กรุณายอมรับเงื่อนไขการใช้บริการ", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
-    const { error } = await signUp(email, password, fullName, role);
+    const { error } = await signUp(emailCheck.value!, passCheck.value!, nameCheck.value!, role);
     setIsLoading(false);
 
     if (error) {

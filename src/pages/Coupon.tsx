@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { validators, checkRateLimit } from "@/lib/sanitize";
 import {
   Tag, Plus, Trash2, Copy, CheckCircle,
   Percent, ArrowLeft, Loader2, Shield
@@ -71,16 +72,48 @@ const Coupon = () => {
 
   // ── สร้าง coupon ใหม่ ──────────────────────────────────────
   const handleCreate = async () => {
-    if (!code.trim() || !discount || !maxUses || !expiresAt) {
+    // ✅ validate รหัสคูปอง
+    const codeCheck = validators.couponCode(code);
+    if (!codeCheck.ok) {
+      toast({ title: codeCheck.error, variant: "destructive" });
+      return;
+    }
+
+    if (!discount || !maxUses || !expiresAt) {
       toast({ title: "กรุณากรอกข้อมูลให้ครบ", variant: "destructive" });
       return;
     }
-    if (Number(discount) < 1 || Number(discount) > 100) {
-      toast({ title: "ส่วนลดต้องอยู่ระหว่าง 1-100%", variant: "destructive" });
+
+    // ✅ validate ส่วนลด 1-100
+    const discountNum = Number(discount);
+    if (!Number.isInteger(discountNum) || discountNum < 1 || discountNum > 100) {
+      toast({ title: "ส่วนลดต้องเป็นจำนวนเต็ม 1-100%", variant: "destructive" });
       return;
     }
-    if (coupons.find((c) => c.code === code.toUpperCase())) {
+
+    // ✅ validate จำนวนครั้งใช้
+    const maxUsesNum = Number(maxUses);
+    if (!Number.isInteger(maxUsesNum) || maxUsesNum < 1 || maxUsesNum > 10000) {
+      toast({ title: "จำนวนครั้งใช้งานต้องอยู่ระหว่าง 1-10,000", variant: "destructive" });
+      return;
+    }
+
+    // ✅ validate วันหมดอายุ
+    const expDate = new Date(expiresAt);
+    if (isNaN(expDate.getTime()) || expDate <= new Date()) {
+      toast({ title: "วันหมดอายุต้องเป็นวันในอนาคต", variant: "destructive" });
+      return;
+    }
+
+    if (coupons.find((c) => c.code === codeCheck.value)) {
       toast({ title: "รหัสคูปองนี้มีอยู่แล้ว", variant: "destructive" });
+      return;
+    }
+
+    // ✅ rate limit — สร้างได้ 10 คูปอง/ชั่วโมง
+    const rate = checkRateLimit("create-coupon", 10, 3600000);
+    if (!rate.allowed) {
+      toast({ title: "สร้างคูปองถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
       return;
     }
 
@@ -90,7 +123,7 @@ const Coupon = () => {
 
     const newCoupon: Coupon = {
       id: Date.now().toString(),
-      code: code.toUpperCase(),
+      code: codeCheck.value!,
       discount: Number(discount),
       maxUses: Number(maxUses),
       usedCount: 0,

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { BookOpen, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { validators, checkRateLimit } from "@/lib/sanitize";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -13,13 +14,22 @@ const ForgotPassword = () => {
   const { toast } = useToast();
 
   const handleSubmit = async () => {
-    if (!email) {
-      toast({ title: "กรุณากรอกอีเมล", variant: "destructive" });
+    // ✅ validate email
+    const emailCheck = validators.email(email);
+    if (!emailCheck.ok) {
+      toast({ title: emailCheck.error, variant: "destructive" });
+      return;
+    }
+
+    // ✅ rate limit — ส่งได้ 3 ครั้ง/10 นาที ป้องกัน spam email
+    const rate = checkRateLimit("forgot-password", 3, 600000);
+    if (!rate.allowed) {
+      toast({ title: "ส่งอีเมลถี่เกินไป กรุณารอ 10 นาที", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(emailCheck.value!, {
       // Supabase จะส่ง link ไปที่อีเมล แล้ว redirect มาที่หน้านี้
       redirectTo: `${window.location.origin}/reset-password`,
     });

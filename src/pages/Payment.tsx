@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { validators, checkRateLimit, sanitizeText } from "@/lib/sanitize";
 import { sampleCourses } from "@/data/mockData";
 import {
   CreditCard, Shield, CheckCircle, Lock, ArrowLeft,
@@ -50,7 +51,18 @@ const Payment = () => {
 
   // ── ใช้คูปอง ──────────────────────────────────────────────
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+    // ✅ validate รหัสคูปอง
+    const codeCheck = validators.couponCode(couponCode);
+    if (!codeCheck.ok) {
+      toast({ title: codeCheck.error, variant: "destructive" });
+      return;
+    }
+    // ✅ rate limit — กรอกคูปองผิดได้ไม่เกิน 5 ครั้ง/นาที
+    const rate = checkRateLimit("apply-coupon", 5, 60000);
+    if (!rate.allowed) {
+      toast({ title: "ลองคูปองถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
+      return;
+    }
     setCouponLoading(true);
     await new Promise((r) => setTimeout(r, 600)); // mock delay
     // TODO: await supabase.from('coupons').select().eq('code', couponCode).single()
@@ -70,10 +82,43 @@ const Payment = () => {
       navigate("/login");
       return;
     }
+
+    // ✅ rate limit — ชำระเงินได้ไม่เกิน 3 ครั้ง/5 นาที ป้องกัน brute force card
+    const rate = checkRateLimit(`payment-${user.id}`, 3, 300000);
+    if (!rate.allowed) {
+      toast({ title: "ลองชำระเงินถี่เกินไป กรุณารอ 5 นาที", variant: "destructive" });
+      return;
+    }
+
+    // ✅ validate ข้อมูลบัตร
     if (!cardName || !cardNumber || !cardExpiry || !cardCvv) {
       toast({ title: "กรุณากรอกข้อมูลบัตรให้ครบ", variant: "destructive" });
       return;
     }
+
+    // ✅ validate รูปแบบบัตร
+    const cardDigits = cardNumber.replace(/\s/g, "");
+    if (cardDigits.length !== 16) {
+      toast({ title: "หมายเลขบัตรต้องมี 16 หลัก", variant: "destructive" });
+      return;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
+      toast({ title: "รูปแบบวันหมดอายุไม่ถูกต้อง (MM/YY)", variant: "destructive" });
+      return;
+    }
+    if (!/^\d{3,4}$/.test(cardCvv)) {
+      toast({ title: "CVV ต้องมี 3-4 หลัก", variant: "destructive" });
+      return;
+    }
+
+    // ✅ validate จำนวนเงิน — ป้องกัน negative amount
+    if (total < 0) {
+      toast({ title: "จำนวนเงินไม่ถูกต้อง", variant: "destructive" });
+      return;
+    }
+
+    // ✅ sanitize ชื่อบัตร
+    const safeCardName = sanitizeText(cardName, 100);
 
     setPayLoading(true);
     await new Promise((r) => setTimeout(r, 1500)); // mock delay
