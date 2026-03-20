@@ -1,3 +1,25 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+build
+*.local
+
+# ✅ Environment variables — ห้าม commit เด็ดขาด
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.*.local
+
 # Logs
 logs
 *.log
@@ -7,12 +29,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,3 +39,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase local
+supabase/.branches
+supabase/.temp

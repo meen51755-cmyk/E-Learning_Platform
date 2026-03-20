@@ -152,6 +152,7 @@ const Community = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="ค้นหากระทู้..."
+                  maxLength={200}
                   className="pl-10 input-focus"
                 />
               </div>
@@ -295,6 +296,7 @@ const Community = () => {
                       onChange={(e) => setMessageText(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                       placeholder="พิมพ์ข้อความ..."
+                    maxLength={1000}
                       className="input-focus flex-1"
                     />
                     <Button size="icon" onClick={handleSendMessage}>

@@ -5,6 +5,7 @@ import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStudentDashboard } from "@/hooks/useDashboard";
+import { useSessionGuard } from "@/hooks/useSessionGuard";
 import { sampleCourses } from "@/data/mockData";
 import {
   BookOpen, Trophy, Flame, Star, Bell, BellOff,
@@ -22,6 +23,8 @@ const getLevel = (xp: number) => {
 
 const StudentDashboard = () => {
   const { user, profile, signOut } = useAuth();
+  useSessionGuard(); // ✅ Single session enforcement
+
   const {
     enrollments, notifications, recentQuiz,
     loading, unreadCount, completedCourses,

@@ -216,6 +216,7 @@ const Payment = () => {
                     value={cardNumber}
                     onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
                     placeholder="0000 0000 0000 0000"
+                  maxLength={19}
                     className="input-focus font-mono"
                     maxLength={19}
                   />
@@ -227,6 +228,7 @@ const Payment = () => {
                       value={cardExpiry}
                       onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                       placeholder="MM/YY"
+                  maxLength={5}
                       className="input-focus"
                       maxLength={5}
                     />

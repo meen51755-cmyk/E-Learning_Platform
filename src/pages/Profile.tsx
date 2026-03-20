@@ -335,7 +335,8 @@ const Profile = () => {
                   <label className="text-sm text-muted-foreground mb-1 block">ชื่อ-นามสกุล <span className="text-destructive">*</span></label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="ชื่อ-นามสกุล" className="pl-10 input-focus" />
+                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="ชื่อ-นามสกุล"
+                    maxLength={100} className="pl-10 input-focus" />
                   </div>
                 </div>
 
@@ -355,6 +356,7 @@ const Profile = () => {
                       value={phone}
                       onChange={(e) => setPhone(formatPhone(e.target.value))}
                       placeholder="086-123-4567"
+                      maxLength={12}
                       className="pl-10 input-focus"
                       inputMode="tel"
                     />
@@ -404,6 +406,7 @@ const Profile = () => {
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                     placeholder="https://yourwebsite.com"
+                    maxLength={500}
                     className="pl-10 input-focus"
                     type="url"
                   />
@@ -419,6 +422,7 @@ const Profile = () => {
                     value={facebook}
                     onChange={(e) => setFacebook(e.target.value)}
                     placeholder="facebook.com/yourpage"
+                    maxLength={200}
                     className="pl-10 input-focus"
                   />
                 </div>
@@ -433,6 +437,7 @@ const Profile = () => {
                     value={youtube}
                     onChange={(e) => setYoutube(e.target.value)}
                     placeholder="youtube.com/@yourchannel"
+                    maxLength={200}
                     className="pl-10 input-focus"
                   />
                 </div>

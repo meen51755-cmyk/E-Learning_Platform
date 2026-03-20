@@ -145,6 +145,7 @@ const Register = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="ชื่อ นามสกุล"
+                  maxLength={100}
                   className="pl-10 input-focus"
                 />
               </div>
@@ -159,6 +160,7 @@ const Register = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
+                  maxLength={254}
                   className="pl-10 input-focus"
                   type="email"
                 />
@@ -175,6 +177,7 @@ const Register = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="อย่างน้อย 8 ตัวอักษร"
+                  maxLength={128}
                   className="pl-10 pr-10 input-focus"
                 />
                 <button

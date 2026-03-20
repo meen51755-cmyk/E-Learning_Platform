@@ -91,6 +91,7 @@ const ForgotPassword = () => {
                 onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
                 type="email"
                 placeholder="you@example.com"
+                maxLength={254}
                 className="pl-10 input-focus"
               />
             </div>
