@@ -27,10 +27,12 @@ const StudentList = () => {
     const fetchData = async () => {
       if (!id) return;
       setLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any;
 
       const [{ data: course }, { data: enrollments }] = await Promise.all([
-        supabase.from("courses").select("title").eq("id", id).single(),
-        supabase.from("enrollments").select("*").eq("course_id", id).order("enrolled_at", { ascending: false }),
+        db.from("courses").select("title").eq("id", id).single(),
+        db.from("enrollments").select("*").eq("course_id", id).order("enrolled_at", { ascending: false }),
       ]);
 
       if (course) setCourseName(course.title);

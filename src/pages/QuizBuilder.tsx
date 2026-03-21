@@ -49,18 +49,21 @@ const QuizBuilder = () => {
     order_index: questions.length,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
   const fetchData = async () => {
     if (!id) return;
     setLoading(true);
 
     const [{ data: course }, { data: qs }] = await Promise.all([
-      supabase.from("courses").select("title").eq("id", id).single(),
-      supabase.from("quiz_questions").select("*").eq("course_id", id).order("order_index"),
+      db.from("courses").select("title").eq("id", id).single(),
+      db.from("quiz_questions").select("*").eq("course_id", id).order("order_index"),
     ]);
 
     if (course) setCourseName(course.title);
     if (qs) {
-      setQuestions(qs.map((q) => ({
+      setQuestions((qs as any[]).map((q) => ({
         ...q,
         choices: q.choices ?? [],
         explanation: q.explanation ?? "",
@@ -75,7 +78,7 @@ const QuizBuilder = () => {
   // ── เพิ่มคำถามใหม่ ──────────────────────────────────────────
   const handleAddQuestion = async () => {
     const template = newQuestionTemplate();
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("quiz_questions")
       .insert({
         course_id: id,
@@ -111,7 +114,7 @@ const QuizBuilder = () => {
     }
 
     setSaving(q.id);
-    const { error } = await supabase
+    const { error } = await db
       .from("quiz_questions")
       .update({
         question_text: check.value,
@@ -130,7 +133,7 @@ const QuizBuilder = () => {
   // ── ลบคำถาม ─────────────────────────────────────────────────
   const handleDeleteQuestion = async (qId: string) => {
     if (!confirm("ลบคำถามนี้?")) return;
-    const { error } = await supabase.from("quiz_questions").delete().eq("id", qId);
+    const { error } = await db.from("quiz_questions").delete().eq("id", qId);
     if (error) toast({ title: "ลบไม่สำเร็จ", variant: "destructive" });
     else {
       setQuestions((prev) => prev.filter((q) => q.id !== qId));

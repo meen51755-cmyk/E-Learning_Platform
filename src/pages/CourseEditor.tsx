@@ -7,10 +7,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validators } from "@/lib/sanitize";
+import UploadContent from "@/components/instructor/UploadContent";
 import {
   Plus, Trash2, ArrowLeft, Save, GripVertical,
   Video, FileText, File, Edit2, ChevronDown,
-  ChevronRight, BookOpen, Award, Loader2, Check
+  ChevronRight, BookOpen, Award, Loader2, Check, Upload
 } from "lucide-react";
 
 interface Lesson {
@@ -48,31 +49,35 @@ const CourseEditor = () => {
 
   // New lesson form
   const [addingLessonTo, setAddingLessonTo] = useState<string | null>(null);
+  const [uploadingLesson, setUploadingLesson] = useState<string | null>(null);
   const [newLesson, setNewLesson] = useState({ title: "", type: "video" as "video" | "article" | "pdf", duration: "" });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
 
   const fetchData = async () => {
     if (!id) return;
     setLoading(true);
 
     const [{ data: courseData }, { data: modulesData }] = await Promise.all([
-      supabase.from("courses").select("title, status").eq("id", id).single(),
-      supabase.from("course_modules").select("*").eq("course_id", id).order("order_index"),
+      db.from("courses").select("title, status").eq("id", id).single(),
+      db.from("course_modules").select("*").eq("course_id", id).order("order_index"),
     ]);
 
     if (courseData) setCourse(courseData);
 
     if (modulesData) {
       const modulesWithLessons = await Promise.all(
-        modulesData.map(async (m) => {
-          const { data: lessons } = await supabase
+        (modulesData as any[]).map(async (m) => {
+          const { data: lessons } = await db
             .from("lessons")
             .select("*")
             .eq("module_id", m.id)
             .order("order_index");
-          return { ...m, lessons: lessons ?? [] };
+          return { ...m, lessons: (lessons ?? []) as any[] };
         })
       );
-      setModules(modulesWithLessons);
+      setModules(modulesWithLessons as any);
       if (modulesWithLessons.length > 0) {
         setExpandedModules(new Set([modulesWithLessons[0].id]));
       }
@@ -99,7 +104,7 @@ const CourseEditor = () => {
       return;
     }
     setAddingModule(true);
-    const { error } = await supabase.from("course_modules").insert({
+    const { error } = await db.from("course_modules").insert({
       course_id: id,
       title: check.value,
       order_index: modules.length,
@@ -117,7 +122,7 @@ const CourseEditor = () => {
   // ── ลบ Module ──────────────────────────────────────────────
   const handleDeleteModule = async (moduleId: string) => {
     if (!confirm("ลบ Module นี้และบทเรียนทั้งหมดในนั้น?")) return;
-    const { error } = await supabase.from("course_modules").delete().eq("id", moduleId);
+    const { error } = await db.from("course_modules").delete().eq("id", moduleId);
     if (error) toast({ title: "ลบไม่สำเร็จ", variant: "destructive" });
     else { toast({ title: "ลบ Module สำเร็จ ✓" }); fetchData(); }
   };
@@ -130,7 +135,7 @@ const CourseEditor = () => {
       return;
     }
     const module = modules.find((m) => m.id === moduleId);
-    const { error } = await supabase.from("lessons").insert({
+    const { error } = await db.from("lessons").insert({
       module_id: moduleId,
       course_id: id,
       title: check.value,
@@ -150,7 +155,7 @@ const CourseEditor = () => {
 
   // ── ลบ Lesson ──────────────────────────────────────────────
   const handleDeleteLesson = async (lessonId: string) => {
-    const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
+    const { error } = await db.from("lessons").delete().eq("id", lessonId);
     if (error) toast({ title: "ลบบทเรียนไม่สำเร็จ", variant: "destructive" });
     else { toast({ title: "ลบบทเรียนสำเร็จ ✓" }); fetchData(); }
   };

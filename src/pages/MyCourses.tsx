@@ -36,15 +36,18 @@ const MyCourses = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all");
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
   const fetchCourses = async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await db
       .from("courses")
       .select("*")
       .eq("instructor_id", user.id)
       .order("created_at", { ascending: false });
-    setCourses(data ?? []);
+    setCourses((data ?? []) as any);
     setLoading(false);
   };
 
@@ -66,7 +69,7 @@ const MyCourses = () => {
   // Toggle publish/draft
   const handleToggleStatus = async (courseId: string, currentStatus: string) => {
     const newStatus = currentStatus === "published" ? "draft" : "published";
-    const { error } = await supabase
+    const { error } = await db
       .from("courses")
       .update({ status: newStatus })
       .eq("id", courseId);
@@ -80,7 +83,7 @@ const MyCourses = () => {
   // Delete course
   const handleDelete = async (courseId: string) => {
     if (!confirm("ยืนยันการลบคอร์สนี้?")) return;
-    const { error } = await supabase.from("courses").delete().eq("id", courseId);
+    const { error } = await db.from("courses").delete().eq("id", courseId);
     if (error) {
       toast({ title: "ลบไม่สำเร็จ", variant: "destructive" });
     } else {
