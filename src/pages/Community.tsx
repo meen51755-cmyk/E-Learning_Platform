@@ -6,108 +6,308 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { validators, checkRateLimit } from "@/lib/sanitize";
-import { MessageSquare, Star, ThumbsUp, Send, Search, Plus } from "lucide-react";
+import { usePosts, usePostLikes, useComments, useReviews, useMessages } from "@/hooks/useCommunity";
+import { sampleCourses } from "@/data/mockData";
+import {
+  MessageSquare, Star, ThumbsUp, Send, Search,
+  Plus, X, Loader2, RefreshCw, ChevronDown
+} from "lucide-react";
 
-const discussions = [
-  { id: "1", title: "วิธีเรียน React ให้เข้าใจเร็ว?", author: "สมชาย", replies: 12, likes: 24, time: "2 ชม.ก่อน" },
-  { id: "2", title: "แนะนำคอร์ส Data Science สำหรับมือใหม่", author: "สุดา", replies: 8, likes: 15, time: "5 ชม.ก่อน" },
-  { id: "3", title: "ปัญหา CSS Flexbox ช่วยดูหน่อยครับ", author: "วรากร", replies: 5, likes: 3, time: "1 วันก่อน" },
-  { id: "4", title: "ใครเรียน Flutter แล้วบ้าง เป็นยังไง?", author: "นิชา", replies: 18, likes: 32, time: "2 วันก่อน" },
-];
+// ── Modal สร้างโพสต์ใหม่ ──────────────────────────────────────
+const NewPostModal = ({
+  onClose, onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (title: string, content: string, category: string) => Promise<void>;
+}) => {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [category, setCategory] = useState("question");
+  const [saving, setSaving] = useState(false);
 
-const reviews = [
-  { id: "1", course: "Complete Web Development Bootcamp", author: "สมศักดิ์", rating: 5, text: "คอร์สดีมาก เนื้อหาครบ สอนเข้าใจง่าย", time: "1 วันก่อน" },
-  { id: "2", course: "Data Science with Python", author: "สุดา", rating: 4, text: "เนื้อหาดี แต่อยากให้มีแบบฝึกหัดมากกว่านี้", time: "3 วันก่อน" },
-  { id: "3", course: "UI/UX Design Masterclass", author: "ประยุทธ์", rating: 5, text: "สอน Figma ได้ดีมาก ใช้งานจริงได้เลย", time: "5 วันก่อน" },
-];
+  const handleSubmit = async () => {
+    const titleCheck = validators.postTitle(title);
+    if (!titleCheck.ok) return;
+    const contentCheck = validators.postContent(content);
+    if (!contentCheck.ok) return;
+    setSaving(true);
+    await onCreate(titleCheck.value!, contentCheck.value!, category);
+    setSaving(false);
+    onClose();
+  };
 
-const contacts = [
-  { name: "อ.สมชาย ใจดี", msg: "ขอบคุณครับ ลองทำดูนะ", time: "2 นาที", online: true },
-  { name: "ดร.วิชัย นักวิจัย", msg: "ส่งการบ้านมาแล้วครับ", time: "1 ชม.", online: false },
-  { name: "สุดา ฉลาดดี", msg: "Module 3 ยากมากเลย", time: "3 ชม.", online: true },
-];
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-background rounded-2xl p-6 w-full max-w-lg space-y-4 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display font-bold text-foreground">สร้างกระทู้ใหม่</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-const initMessages = [
-  { from: "other", text: "สวัสดีครับ มีอะไรสงสัยไหมครับ?", time: "10:00" },
-  { from: "me", text: "สวัสดีครับอาจารย์ มีคำถามเรื่อง React Hooks ครับ", time: "10:02" },
-  { from: "other", text: "ได้เลยครับ ถามมาได้เลย", time: "10:03" },
-  { from: "me", text: "useEffect กับ useLayoutEffect ต่างกันยังไงครับ?", time: "10:05" },
-  { from: "other", text: "ขอบคุณครับ ลองทำดูนะ", time: "10:08" },
-];
+        <div>
+          <label className="text-sm text-muted-foreground mb-1 block">หมวดหมู่</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full bg-muted rounded-lg px-3 py-2 text-sm text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="question">❓ คำถาม</option>
+            <option value="review">⭐ รีวิว</option>
+            <option value="general">💬 ทั่วไป</option>
+            <option value="announcement">📢 ประกาศ</option>
+          </select>
+        </div>
 
+        <div>
+          <label className="text-sm text-muted-foreground mb-1 block">หัวข้อ <span className="text-destructive">*</span></label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="หัวข้อกระทู้..."
+            maxLength={200}
+            className="input-focus"
+          />
+          <p className="text-xs text-muted-foreground text-right mt-1">{title.length}/200</p>
+        </div>
+
+        <div>
+          <label className="text-sm text-muted-foreground mb-1 block">เนื้อหา <span className="text-destructive">*</span></label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="เล่าให้ฟังหน่อย..."
+            rows={4}
+            maxLength={5000}
+            className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          />
+          <p className="text-xs text-muted-foreground text-right mt-1">{content.length}/5000</p>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose}>ยกเลิก</Button>
+          <Button variant="hero" className="flex-1" onClick={handleSubmit} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "โพสต์"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Post Card ─────────────────────────────────────────────────
+const PostCard = ({
+  post, liked, onLike, onOpen,
+}: {
+  post: import("@/hooks/useCommunity").Post;
+  liked: boolean;
+  onLike: () => void;
+  onOpen: () => void;
+}) => {
+  const categoryLabel: Record<string, string> = {
+    question: "❓ คำถาม", review: "⭐ รีวิว",
+    general: "💬 ทั่วไป", announcement: "📢 ประกาศ",
+  };
+
+  return (
+    <div className="card-elevated p-5 hover:border-primary/20 transition-all cursor-pointer" onClick={onOpen}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+          {categoryLabel[post.category] ?? post.category}
+        </span>
+        {post.is_pinned && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning">📌 ปักหมุด</span>
+        )}
+      </div>
+      <h3 className="font-semibold text-foreground mb-2 line-clamp-2">{post.title}</h3>
+      {post.content && (
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{post.content}</p>
+      )}
+      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+            {(post.author_name ?? "?").charAt(0)}
+          </div>
+          <span className="text-xs">{post.author_name}</span>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onLike(); }}
+          className={`flex items-center gap-1 text-xs transition-colors ${liked ? "text-primary" : "hover:text-primary"}`}
+        >
+          <ThumbsUp className="w-3.5 h-3.5" />
+          {post.likes_count + (liked ? 0 : 0)}
+        </button>
+        <span className="flex items-center gap-1 text-xs">
+          <MessageSquare className="w-3.5 h-3.5" />
+          ความคิดเห็น
+        </span>
+        <span className="text-xs ml-auto">
+          {new Date(post.created_at).toLocaleDateString("th-TH")}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ── Post Detail Modal ─────────────────────────────────────────
+const PostDetailModal = ({
+  post, onClose,
+}: {
+  post: import("@/hooks/useCommunity").Post;
+  onClose: () => void;
+}) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { comments, addComment } = useComments(post.id);
+  const [commentText, setCommentText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleComment = async () => {
+    if (!user) {
+      toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
+      return;
+    }
+    const check = validators.postContent(commentText);
+    if (!check.ok) {
+      toast({ title: check.error, variant: "destructive" });
+      return;
+    }
+    const rate = checkRateLimit(`comment-${user.id}`, 10, 60000);
+    if (!rate.allowed) {
+      toast({ title: "คอมเมนต์ถี่เกินไป", variant: "destructive" });
+      return;
+    }
+    setSending(true);
+    const result = await addComment(check.value!);
+    if (!result.ok) toast({ title: "เกิดข้อผิดพลาด", variant: "destructive" });
+    else setCommentText("");
+    setSending(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-background rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-fade-in">
+        <div className="p-6 border-b border-border flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display font-bold text-foreground">{post.title}</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              โดย {post.author_name} · {new Date(post.created_at).toLocaleDateString("th-TH")}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {post.content && (
+            <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
+          )}
+
+          <div className="border-t border-border pt-4">
+            <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-primary" />
+              ความคิดเห็น ({comments.length})
+            </h3>
+            {comments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">ยังไม่มีความคิดเห็น เป็นคนแรกสิ!</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => (
+                  <div key={c.id} className="flex gap-3">
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+                      {(c.author_name ?? "?").charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-foreground">{c.author_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(c.created_at).toLocaleDateString("th-TH")}
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground">{c.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-border flex gap-2">
+          <Input
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleComment()}
+            placeholder="เขียนความคิดเห็น..."
+            maxLength={1000}
+            className="input-focus flex-1"
+          />
+          <Button size="icon" onClick={handleComment} disabled={sending}>
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Main Community ────────────────────────────────────────────
 const Community = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<"discussions" | "reviews" | "messages">("discussions");
-  const [messageText, setMessageText] = useState("");
-  const [messages, setMessages] = useState(initMessages);
-  const [likedPosts, setLikedPosts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showNewPost, setShowNewPost] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<import("@/hooks/useCommunity").Post | null>(null);
+  const [messageText, setMessageText] = useState("");
 
-  const displayName = profile?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "ผู้ใช้";
-  const initials = profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?";
+  const { posts, loading: postsLoading, toggleLike, createPost, refetch } = usePosts(searchQuery);
+  const { reviews } = useReviews();
+  const postIds = posts.map((p) => p.id);
+  const likedIds = usePostLikes(postIds);
 
-  const filteredDiscussions = discussions.filter((d) =>
-    d.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Mock contact สำหรับ messages (TODO: ดึง contacts จริง)
+  const MOCK_RECEIVER = "00000000-0000-0000-0000-000000000000";
+  const { messages, sendMessage } = useMessages(user ? MOCK_RECEIVER : null);
 
-  const handleSendMessage = () => {
+  const handleNewPost = async (title: string, content: string, category: string) => {
     if (!user) {
       toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
       return;
     }
-
-    // ✅ validate ข้อความ
-    const msgCheck = validators.message(messageText);
-    if (!msgCheck.ok) {
-      toast({ title: msgCheck.error, variant: "destructive" });
-      return;
-    }
-
-    // ✅ rate limit — ส่งได้ไม่เกิน 10 ข้อความ/นาที
-    const rate = checkRateLimit(`message-${user.id}`, 10, 60000);
-    if (!rate.allowed) {
-      toast({ title: "ส่งข้อความถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
-      return;
-    }
-
-    const now = new Date();
-    const time = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
-    setMessages((prev) => [...prev, { from: "me", text: msgCheck.value!, time }]);
-    setMessageText("");
-    // TODO: supabase.from('messages').insert({ sender_id: user.id, content: msgCheck.value })
-  };
-
-  const handleLike = (id: string) => {
-    if (!user) {
-      toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
-      return;
-    }
-    // ✅ rate limit — ไลก์ได้ไม่เกิน 20 ครั้ง/นาที
-    const rate = checkRateLimit(`like-${user.id}`, 20, 60000);
-    if (!rate.allowed) {
-      toast({ title: "ไลก์ถี่เกินไป", variant: "destructive" });
-      return;
-    }
-    setLikedPosts((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
-  };
-
-  const handleNewPost = () => {
-    if (!user) {
-      toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
-      return;
-    }
-    // ✅ rate limit — สร้างโพสต์ได้ไม่เกิน 3 ครั้ง/นาที
     const rate = checkRateLimit(`new-post-${user.id}`, 3, 60000);
     if (!rate.allowed) {
       toast({ title: "สร้างโพสต์ถี่เกินไป กรุณารอสักครู่", variant: "destructive" });
       return;
     }
-    toast({ title: "ฟีเจอร์นี้กำลังพัฒนา" });
-    // TODO: เปิด modal สร้างกระทู้ใหม่
+    const result = await createPost(title, content, category);
+    if (result.ok) {
+      toast({ title: "โพสต์สำเร็จ! ✓" });
+    } else {
+      toast({ title: "โพสต์ไม่สำเร็จ", description: result.error, variant: "destructive" });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!user) {
+      toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" });
+      return;
+    }
+    const check = validators.message(messageText);
+    if (!check.ok) {
+      toast({ title: check.error, variant: "destructive" });
+      return;
+    }
+    const rate = checkRateLimit(`msg-${user.id}`, 10, 60000);
+    if (!rate.allowed) {
+      toast({ title: "ส่งข้อความถี่เกินไป", variant: "destructive" });
+      return;
+    }
+    const result = await sendMessage(check.value!);
+    if (result.ok) setMessageText("");
   };
 
   const tabs = [
@@ -119,13 +319,27 @@ const Community = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {showNewPost && (
+        <NewPostModal
+          onClose={() => setShowNewPost(false)}
+          onCreate={handleNewPost}
+        />
+      )}
+
+      {selectedPost && (
+        <PostDetailModal
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+        />
+      )}
+
       <div className="container mx-auto container-padding py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-display font-bold text-foreground">ชุมชน LearnHub</h1>
           <p className="text-muted-foreground mt-1">พูดคุย แลกเปลี่ยน และรีวิวคอร์ส</p>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-muted rounded-lg p-1 w-fit">
           {tabs.map((tab) => (
             <button
@@ -152,43 +366,45 @@ const Community = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="ค้นหากระทู้..."
-                  maxLength={200}
                   className="pl-10 input-focus"
+                  maxLength={200}
                 />
               </div>
-              <Button variant="hero" onClick={handleNewPost}>
-                <Plus className="w-4 h-4" /> สร้างกระทู้ใหม่
+              <Button variant="ghost" size="icon" onClick={refetch} title="รีเฟรช">
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+              <Button variant="hero" onClick={() => {
+                if (!user) { toast({ title: "กรุณาเข้าสู่ระบบก่อน", variant: "destructive" }); return; }
+                setShowNewPost(true);
+              }}>
+                <Plus className="w-4 h-4" /> สร้างกระทู้
               </Button>
             </div>
 
-            {filteredDiscussions.length === 0 ? (
+            {/* Realtime indicator */}
+            <div className="flex items-center gap-1.5 text-xs text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
+              Realtime — อัปเดตอัตโนมัติ
+            </div>
+
+            {postsLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+              </div>
+            ) : posts.length === 0 ? (
               <div className="card-elevated p-8 text-center text-muted-foreground">
-                ไม่พบกระทู้ที่ค้นหา
+                <MessageSquare className="w-10 h-10 mx-auto opacity-30 mb-3" />
+                <p>ยังไม่มีกระทู้ เป็นคนแรกที่โพสต์สิ!</p>
               </div>
             ) : (
-              filteredDiscussions.map((post) => (
-                <div
+              posts.map((post) => (
+                <PostCard
                   key={post.id}
-                  className="card-elevated p-5 hover:border-primary/20 transition-colors cursor-pointer"
-                >
-                  <h3 className="font-semibold text-foreground mb-2">{post.title}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>โดย {post.author}</span>
-                    <span className="flex items-center gap-1">
-                      <MessageSquare className="w-3.5 h-3.5" /> {post.replies}
-                    </span>
-                    <button
-                      onClick={() => handleLike(post.id)}
-                      className={`flex items-center gap-1 transition-colors ${
-                        likedPosts.includes(post.id) ? "text-primary" : "hover:text-primary"
-                      }`}
-                    >
-                      <ThumbsUp className="w-3.5 h-3.5" />
-                      {post.likes + (likedPosts.includes(post.id) ? 1 : 0)}
-                    </button>
-                    <span>{post.time}</span>
-                  </div>
-                </div>
+                  post={post}
+                  liked={likedIds.has(post.id)}
+                  onLike={() => toggleLike(post.id, likedIds.has(post.id))}
+                  onOpen={() => setSelectedPost(post)}
+                />
               ))
             )}
           </div>
@@ -197,26 +413,35 @@ const Community = () => {
         {/* ── Reviews ─────────────────────────────────────────── */}
         {activeTab === "reviews" && (
           <div className="space-y-4 animate-fade-in">
-            {reviews.map((review) => (
-              <div key={review.id} className="card-elevated p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-primary">{review.course}</span>
-                  <div className="flex items-center gap-0.5">
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${i < review.rating ? "fill-warning text-warning" : "text-muted"}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-foreground">{review.text}</p>
-                <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-                  <span>โดย {review.author}</span>
-                  <span>• {review.time}</span>
-                </div>
+            {reviews.length === 0 ? (
+              <div className="card-elevated p-8 text-center text-muted-foreground">
+                <Star className="w-10 h-10 mx-auto opacity-30 mb-3" />
+                <p>ยังไม่มีรีวิว</p>
               </div>
-            ))}
+            ) : (
+              reviews.map((review) => {
+                const course = sampleCourses.find((c) => c.id === review.course_id);
+                return (
+                  <div key={review.id} className="card-elevated p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-primary">
+                        {course?.title ?? review.course_id}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < review.rating ? "fill-warning text-warning" : "text-muted"}`} />
+                        ))}
+                      </div>
+                    </div>
+                    {review.content && <p className="text-foreground text-sm">{review.content}</p>}
+                    <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
+                      <span>โดย {review.author_name}</span>
+                      <span>• {new Date(review.created_at).toLocaleDateString("th-TH")}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
@@ -229,80 +454,55 @@ const Community = () => {
                 <p className="text-muted-foreground">กรุณาเข้าสู่ระบบเพื่อส่งข้อความ</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[500px]">
-                {/* Contact List */}
-                <div className="card-elevated overflow-hidden flex flex-col">
-                  <div className="p-3 border-b border-border">
-                    <Input placeholder="ค้นหาผู้ติดต่อ..." className="input-focus h-8 text-sm" />
+              <div className="card-elevated flex flex-col h-[500px] overflow-hidden">
+                <div className="p-3 border-b border-border flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                    {profile?.full_name?.charAt(0) ?? "?"}
                   </div>
-                  <div className="overflow-y-auto flex-1">
-                    {contacts.map((contact, i) => (
-                      <div
-                        key={i}
-                        className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/30 transition-colors ${
-                          i === 0 ? "bg-primary/5" : ""
-                        }`}
-                      >
-                        <div className="relative">
-                          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium text-muted-foreground">
-                            {contact.name.charAt(0)}
-                          </div>
-                          {contact.online && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-success rounded-full border-2 border-background" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{contact.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{contact.msg}</p>
-                        </div>
-                        <span className="text-xs text-muted-foreground shrink-0">{contact.time}</span>
-                      </div>
-                    ))}
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{profile?.full_name ?? user.email}</p>
+                    <div className="flex items-center gap-1 text-xs text-success">
+                      <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
+                      Realtime
+                    </div>
                   </div>
                 </div>
 
-                {/* Chat */}
-                <div className="md:col-span-2 card-elevated flex flex-col overflow-hidden">
-                  <div className="p-3 border-b border-border flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium text-muted-foreground">
-                      อ
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">ยังไม่มีข้อความ</p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">อ.สมชาย ใจดี</p>
-                      <p className="text-xs text-success">ออนไลน์</p>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {messages.map((msg, i) => (
-                      <div key={i} className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"}`}>
-                        <div
-                          className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${
-                            msg.from === "me"
-                              ? "bg-primary text-primary-foreground rounded-br-md"
-                              : "bg-muted text-foreground rounded-bl-md"
-                          }`}
-                        >
-                          <p>{msg.text}</p>
-                          <p className={`text-xs mt-1 ${msg.from === "me" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                            {msg.time}
+                  ) : (
+                    messages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.sender_id === user.id ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${
+                          msg.sender_id === user.id
+                            ? "bg-primary text-primary-foreground rounded-br-md"
+                            : "bg-muted text-foreground rounded-bl-md"
+                        }`}>
+                          <p>{msg.content}</p>
+                          <p className={`text-xs mt-1 ${msg.sender_id === user.id ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                            {new Date(msg.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="p-3 border-t border-border flex items-center gap-2">
-                    <Input
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                      placeholder="พิมพ์ข้อความ..."
+                    ))
+                  )}
+                </div>
+
+                <div className="p-3 border-t border-border flex items-center gap-2">
+                  <Input
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                    placeholder="พิมพ์ข้อความ..."
                     maxLength={1000}
-                      className="input-focus flex-1"
-                    />
-                    <Button size="icon" onClick={handleSendMessage}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
+                    className="input-focus flex-1"
+                  />
+                  <Button size="icon" onClick={handleSendMessage}>
+                    <Send className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             )}
