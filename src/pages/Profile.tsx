@@ -57,11 +57,11 @@ const Profile = () => {
       setFullName(profile.full_name ?? "");
       setBio(profile.bio ?? "");
       setAvatarUrl(profile.avatar_url ?? null);
-      // TODO: ดึงจาก profiles table เมื่อเพิ่ม column phone, website, facebook, youtube
-      // setPhone(profile.phone ?? "");
-      // setWebsite(profile.website ?? "");
-      // setFacebook(profile.facebook ?? "");
-      // setYoutube(profile.youtube ?? "");
+      // ✅ ดึง phone/website/social จาก profiles table
+      setPhone((profile as any).phone ?? "");
+      setWebsite((profile as any).website ?? "");
+      setFacebook((profile as any).facebook ?? "");
+      setYoutube((profile as any).youtube ?? "");
     }
   }, [profile]);
 
@@ -177,6 +177,10 @@ const Profile = () => {
       .update({
         full_name: nameCheck.value,
         bio: bioCheck.value,
+        phone: phoneCheck.value || null,
+        website: websiteCheck.value || null,
+        facebook: fbCheck.value || null,
+        youtube: ytCheck.value || null,
       })
       .eq("user_id", user.id);
 
