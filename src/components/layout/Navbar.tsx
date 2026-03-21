@@ -3,8 +3,10 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Search, Menu, X, BookOpen, Code, User, LogOut,
-  LayoutDashboard, GraduationCap, ShieldCheck, Bell, BellOff
+  LayoutDashboard, GraduationCap, ShieldCheck, Bell, BellOff,
+  Sun, Moon, Monitor
 } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import SearchModal from "@/components/SearchModal";
@@ -20,6 +22,7 @@ import {
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const { theme, setTheme, isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, roles, signOut, loading } = useAuth();
@@ -176,6 +179,26 @@ const Navbar = () => {
             >
               <Search className="w-5 h-5" />
             </Button>
+
+            {/* Theme toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title="เปลี่ยน Theme">
+                  {isDark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                <DropdownMenuItem onClick={() => setTheme("light")} className={theme === "light" ? "text-primary" : ""}>
+                  <Sun className="w-4 h-4 mr-2" /> Light {theme === "light" && "✓"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")} className={theme === "dark" ? "text-primary" : ""}>
+                  <Moon className="w-4 h-4 mr-2" /> Dark {theme === "dark" && "✓"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")} className={theme === "system" ? "text-primary" : ""}>
+                  <Monitor className="w-4 h-4 mr-2" /> System {theme === "system" && "✓"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Notification Bell */}
             {user && (
