@@ -23,14 +23,20 @@ import Community from "./pages/Community";
 import Payment from "./pages/Payment";
 import TransactionHistory from "./pages/TransactionHistory";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import EmailVerification from "./pages/EmailVerification";
 import Profile from "./pages/Profile";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ApiDocs from "./pages/ApiDocs";
 import CreateCourse from "./pages/CreateCourse";
+import MyCourses from "./pages/MyCourses";
+import CourseEditor from "./pages/CourseEditor";
+import QuizBuilder from "./pages/QuizBuilder";
+import StudentList from "./pages/StudentList";
+import Coupon from "./pages/Coupon";
 import NotFound from "./pages/NotFound";
-import ResetPassword from "./pages/ResetPassword";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -138,6 +144,68 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
                     <CreateCourse />
+                  </RoleBasedRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructor/coupons"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
+                    <Coupon />
+                  </RoleBasedRoute>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ── Instructor: คอร์สของฉัน ── */}
+            <Route
+              path="/instructor/courses"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
+                    <MyCourses />
+                  </RoleBasedRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructor/courses/create"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
+                    <CreateCourse />
+                  </RoleBasedRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructor/courses/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
+                    <CourseEditor />
+                  </RoleBasedRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructor/courses/:id/quiz"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
+                    <QuizBuilder />
+                  </RoleBasedRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructor/courses/:id/students"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute allowedRoles={["instructor", "admin"]}>
+                    <StudentList />
                   </RoleBasedRoute>
                 </ProtectedRoute>
               }
