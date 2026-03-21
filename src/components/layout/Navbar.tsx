@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import SearchModal from "@/components/SearchModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +19,22 @@ import {
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, roles, signOut, loading } = useAuth();
+
+  // ── Keyboard shortcut: "/" เพื่อเปิด search ────────────────────
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "/" && !["INPUT","TEXTAREA"].includes((e.target as HTMLElement).tagName)) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, []);
 
   // ── Notifications realtime ──────────────────────────────────
   const [unreadCount, setUnreadCount] = useState(0);
@@ -121,6 +135,7 @@ const Navbar = () => {
   const initials    = displayName.charAt(0).toUpperCase() || "?";
 
   return (
+    <>
     <nav className="sticky top-0 z-50 glass border-b border-border">
       <div className="container mx-auto container-padding">
         <div className="flex items-center justify-between h-16">
@@ -153,11 +168,14 @@ const Navbar = () => {
 
           {/* Desktop actions */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/courses">
-              <Button variant="ghost" size="icon">
-                <Search className="w-5 h-5" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchOpen(true)}
+              title="ค้นหา (กด /)"
+            >
+              <Search className="w-5 h-5" />
+            </Button>
 
             {/* Notification Bell */}
             {user && (
@@ -358,6 +376,10 @@ const Navbar = () => {
         )}
       </div>
     </nav>
+
+      {/* Search Modal */}
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   );
 };
 
