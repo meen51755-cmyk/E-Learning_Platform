@@ -1,10 +1,11 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Search, Menu, X, BookOpen, Code, User, LogOut,
-  LayoutDashboard, GraduationCap, ShieldCheck, Bell
+  LayoutDashboard, GraduationCap, ShieldCheck, Bell, BellOff
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
@@ -20,6 +21,79 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, roles, signOut, loading } = useAuth();
+
+  // ── Notifications realtime ──────────────────────────────────
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<Array<{
+    id: string; title: string; message: string | null;
+    is_read: boolean; created_at: string; link: string | null;
+  }>>([]);
+  const [showNotif, setShowNotif] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); setNotifications([]); return; }
+
+    const fetchNotifs = async () => {
+      const { data } = await supabase
+        .from("notifications")
+        .select("id, title, message, is_read, created_at, link")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (data) {
+        setNotifications(data);
+        setUnreadCount(data.filter((n) => !n.is_read).length);
+      }
+    };
+    fetchNotifs();
+
+    const channel = supabase
+      .channel(`navbar-notif-${user.id}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "notifications",
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        setNotifications((prev) => [payload.new as any, ...prev.slice(0, 9)]);
+        setUnreadCount((prev) => prev + 1);
+      })
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "notifications",
+        filter: `user_id=eq.${user.id}`,
+      }, () => fetchNotifs())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // ปิด dropdown เมื่อคลิกข้างนอก
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotif(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const markAllRead = async () => {
+    if (!user || unreadCount === 0) return;
+    await supabase.from("notifications").update({ is_read: true })
+      .eq("user_id", user.id).eq("is_read", false);
+    setUnreadCount(0);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  };
+
+  const handleNotifClick = async (notif: typeof notifications[0]) => {
+    if (!notif.is_read) {
+      await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+      setNotifications((prev) => prev.map((n) => n.id === notif.id ? { ...n, is_read: true } : n));
+    }
+    setShowNotif(false);
+    if (notif.link) navigate(notif.link);
+  };
 
   const navLinks = [
     { path: "/courses",   label: "คอร์สเรียน" },
@@ -84,6 +158,65 @@ const Navbar = () => {
                 <Search className="w-5 h-5" />
               </Button>
             </Link>
+
+            {/* Notification Bell */}
+            {user && (
+              <div className="relative" ref={notifRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowNotif(!showNotif)}
+                  className="relative"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center font-bold animate-pulse">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Button>
+
+                {showNotif && (
+                  <div className="absolute right-0 top-11 w-80 bg-background border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                      <h3 className="text-sm font-semibold text-foreground">การแจ้งเตือน</h3>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} className="text-xs text-primary hover:underline">
+                          อ่านทั้งหมด
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <BellOff className="w-8 h-8 mx-auto text-muted-foreground opacity-30 mb-2" />
+                          <p className="text-sm text-muted-foreground">ไม่มีการแจ้งเตือน</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleNotifClick(notif)}
+                            className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 cursor-pointer hover:bg-muted/30 transition-colors ${!notif.is_read ? "bg-primary/5" : ""}`}
+                          >
+                            <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!notif.is_read ? "bg-primary" : "bg-muted"}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground line-clamp-1">{notif.title}</p>
+                              {notif.message && (
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground/60 mt-1">
+                                {new Date(notif.created_at).toLocaleDateString("th-TH")}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {!loading && user ? (
               <DropdownMenu>
